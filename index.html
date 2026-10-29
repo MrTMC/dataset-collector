@@ -857,7 +857,14 @@ async function boot(){
   if(!window.supabase){try{await loadScript("vendor/supabase.js")}catch{}}
   if(!window.supabase){try{await loadScript("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js")}catch{}}
   if(!window.supabase){showAuthShell();$("#authroot").innerHTML=authLayout(`<h1>Tidak dapat terhubung</h1><p class="muted">Pustaka database gagal dimuat. Periksa koneksi internet lalu muat ulang halaman.</p>`);return}
-  S.sb=window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseKey,{auth:{persistSession:true,autoRefreshToken:true}});
+  const badUrl=!/^https:\/\/[a-z0-9-]+\.supabase\.(co|in)\/?$/i.test(String(CFG.supabaseUrl).trim())&&!IS_PREVIEW;
+  const badKey=/^sb_secret_|service_role/i.test(String(CFG.supabaseKey));
+  if(badUrl||badKey){showAuthShell();$("#authroot").innerHTML=authLayout(`<h1>Konfigurasi belum benar</h1>
+    ${badUrl?`<p class="note bad"><b>supabaseUrl</b> di <span class="mono">config.js</span> harus berupa Project URL, misalnya <span class="mono">https://abcdefgh.supabase.co</span>. ${/^postgres/i.test(String(CFG.supabaseUrl))?"Yang terisi sekarang adalah connection string database yang memuat kata sandi. Hapus dari config.js dan segera reset kata sandi database di Supabase → Project Settings → Database.":""}</p>`:""}
+    ${badKey?`<p class="note bad"><b>supabaseKey</b> berisi secret key. Ganti dengan Publishable key (<span class="mono">sb_publishable_…</span>) dan buat ulang secret key di Supabase.</p>`:""}
+    <p class="muted small">Ambil Project URL dan Publishable key di Supabase → tombol Connect atau Project Settings → API Keys.</p>`);return}
+  try{S.sb=window.supabase.createClient(String(CFG.supabaseUrl).trim().replace(/\/$/,""),String(CFG.supabaseKey).trim(),{auth:{persistSession:true,autoRefreshToken:true}})}
+  catch(e){showAuthShell();$("#authroot").innerHTML=authLayout(`<h1>Tidak dapat terhubung</h1><p class="note bad">${esc(e.message||e)}</p><p class="muted small">Periksa supabaseUrl dan supabaseKey di config.js.</p>`);return}
   S.sb.auth.onAuthStateChange(ev=>{if(ev==="SIGNED_OUT"&&S.user)resetSession()});
   window.addEventListener("hashchange",onRoute);
   let session=null;try{({data:{session}}=await S.sb.auth.getSession())}catch{}
@@ -865,7 +872,8 @@ async function boot(){
 }
 async function showAuth(msg){
   S.authView="checking";S.authMsg=msg||null;renderAuth();
-  let needs=false;try{const {data,error}=await S.sb.rpc("needs_setup");if(error)throw error;needs=!!data}catch(e){console.warn(e)}
+  let needs=false,err=null;try{const {data,error}=await S.sb.rpc("needs_setup");if(error)throw error;needs=!!data}catch(e){console.warn(e);err=e}
+  if(err&&!msg){const m=String(err.message||err);S.authMsg={bad:true,text:/needs_setup|schema cache|does not exist|404/i.test(m)?"Database belum disiapkan: jalankan supabase/schema.sql di Supabase → SQL Editor, lalu muat ulang halaman.":/Failed to fetch|NetworkError|Load failed/i.test(m)?"Tidak dapat menghubungi Supabase. Periksa koneksi internet dan supabaseUrl di config.js.":/Invalid API key|apikey|JWT/i.test(m)?"supabaseKey di config.js tidak valid. Salin ulang Publishable key dari Supabase.":"Gagal menghubungi database: "+m}}
   S.authView=needs?"setup":"login";renderAuth();
 }
 function showAuthShell(){document.body.classList.add("noauth");$("#shell").hidden=true;$("#tabbar").hidden=true;$("#authroot").hidden=false}
