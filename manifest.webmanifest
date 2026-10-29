@@ -1,0 +1,12 @@
+{
+  "name": "Dataset Collector",
+  "short_name": "Dataset Collector",
+  "description": "Pengumpulan dataset citra dengan rekomendasi kategori AI lokal.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F4F7F5",
+  "theme_color": "#12684F",
+  "lang": "id",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

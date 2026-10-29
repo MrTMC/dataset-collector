@@ -1,0 +1,76 @@
+{
+ "name": "Klasifikasi Sampah 5 Kelas",
+ "version": "waste5-v1",
+ "created": "2026-10-28",
+ "classes": [
+  "organik",
+  "kertas",
+  "plastik",
+  "logam",
+  "residu"
+ ],
+ "architecture": "MobileNetV3-Large 1.0 (pretrain ImageNet-21K, beku) + kepala regresi logistik 5 kelas",
+ "input": {
+  "name": "image",
+  "shape": [
+   1,
+   3,
+   224,
+   224
+  ],
+  "format": "RGB float32 0–255; resize sisi pendek 256 lalu potong tengah 224"
+ },
+ "outputs": {
+  "probs": "[1,5] probabilitas",
+  "embedding": "[1,1280] vektor fitur ternormalisasi L2 (untuk adaptasi k-NN)"
+ },
+ "files": {
+  "model": "models/waste5-v1.onnx",
+  "model_bytes": 8471544,
+  "wasm": "ort/ort-wasm-simd-threaded.wasm",
+  "wasm_bytes": 14239897,
+  "weights": "float16 (dihitung float32)",
+  "model_b64": "models/waste5-v1.onnx.b64.txt",
+  "model_b64_bytes": 11295392
+ },
+ "runtime": "ONNX Runtime Web 1.30.0 (WebAssembly SIMD, 1 thread)",
+ "license": "Bobot backbone: timm mobilenetv3_large_100.miil_in21k (Apache-2.0) via ONNX Model Zoo (Apache-2.0); data latih kepala: AlphaTrash (MIT) dan TrashNet (MIT); ONNX Runtime Web (MIT). Bobot ImageNet tunduk pada ketentuan riset ImageNet.",
+ "training_data": {
+  "alphatrash": "5.691 foto, Thailand, kamera di dalam tempat sampah AlphaTrash",
+  "trashnet": "2.026 foto (tanpa kaca), latar putih, AS",
+  "label_map": {
+   "organic": "organik",
+   "paper": "kertas",
+   "cardboard": "kertas",
+   "plastic": "plastik",
+   "metal": "logam",
+   "general/trash": "residu"
+  }
+ },
+ "evaluation": {
+  "summary": "90,1% pada 949 foto uji (grup terpisah); 50% lintas dataset tanpa adaptasi",
+  "heldout_combined_acc": 0.9009,
+  "heldout_combined_n": 949,
+  "heldout_recall": {
+   "organik": 0.9848484848484849,
+   "kertas": 0.9326241134751773,
+   "plastik": 0.8984962406015038,
+   "logam": 0.9247311827956989,
+   "residu": 0.8456375838926175
+  },
+  "alphatrash_grouped_acc": 0.9340836012861736,
+  "alphatrash_official_split_acc": 0.950530035335689,
+  "cross_dataset_trashnet_acc": 0.49950641658440276,
+  "cross_dataset_with_10_verified_per_class": 0.6209181388022815,
+  "latency_ms": {
+   "onnxruntime_cpu_1thread_server": 6.9,
+   "onnxruntime_web_wasm_1thread_server": 41.3
+  }
+ },
+ "limitations": [
+  "Kelas organik hanya berasal dari satu sumber (AlphaTrash) sehingga keragamannya terbatas.",
+  "Akurasi turun tajam pada foto dengan latar dan kamera berbeda (50% lintas dataset); foto terverifikasi proyek dipakai untuk adaptasi.",
+  "Kaca tidak termasuk kelas; foto kaca cenderung diprediksi plastik atau logam.",
+  "Model belum diuji pada foto lapangan kampus di Indonesia."
+ ]
+}

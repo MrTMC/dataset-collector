@@ -1,0 +1,1717 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#12684F">
+<title>Dataset Collector</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<style>
+/* Layout: app shell — sidebar on wide screens, top bar + bottom tab bar with a raised camera button on phones.
+   The capture screen is one scroll: session → photo → object → category → filename + save at the very end. */
+:root{
+  --bg:#F1F4EF; --surface:#FFFFFF; --surface-2:#EDF1EA; --surface-3:#E3E9DF; --line:#D8DFD3; --fg:#14201A; --muted:#5A6A61;
+  --accent:#12684F; --accent-hover:#0E5A44; --accent-ink:#FFFFFF; --accent-soft:#DAEEE4; --accent-line:#A9D5C1;
+  --ok:#1C7340; --ok-soft:#DDF1E3; --warn:#94560A; --warn-soft:#FBEED8; --bad:#B42318; --bad-soft:#FCE4E1;
+  --c-organik:#3F7D2A; --c-kertas:#9A6A2E; --c-plastik:#1F5FAD; --c-logam:#5C6772; --c-residu:#3A3A3A;
+  --shadow-sm:0 1px 2px rgba(20,32,26,.06); --shadow:0 1px 2px rgba(20,32,26,.05),0 6px 20px rgba(20,32,26,.06);
+  --shadow-lg:0 12px 40px rgba(20,32,26,.18);
+  --f-ui:"Plus Jakarta Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --r:16px; --r-sm:11px; --r-xs:8px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0C1311; --surface:#131C19; --surface-2:#192420; --surface-3:#21302A; --line:#283732; --fg:#E5EEE9; --muted:#93A69D;
+  --accent:#4CC3A3; --accent-hover:#63D0B2; --accent-ink:#052219; --accent-soft:#143A30; --accent-line:#24604F;
+  --ok:#6FCF8E; --ok-soft:#163324; --warn:#EBAF55; --warn-soft:#3A2B12; --bad:#F2877C; --bad-soft:#3E1A16;
+  --c-organik:#83C267; --c-kertas:#D7A76C; --c-plastik:#72A9F0; --c-logam:#AAB4BF; --c-residu:#C9CCCB;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.3); --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.25); --shadow-lg:0 12px 40px rgba(0,0,0,.5);
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0C1311; --surface:#131C19; --surface-2:#192420; --surface-3:#21302A; --line:#283732; --fg:#E5EEE9; --muted:#93A69D;
+  --accent:#4CC3A3; --accent-hover:#63D0B2; --accent-ink:#052219; --accent-soft:#143A30; --accent-line:#24604F;
+  --ok:#6FCF8E; --ok-soft:#163324; --warn:#EBAF55; --warn-soft:#3A2B12; --bad:#F2877C; --bad-soft:#3E1A16;
+  --c-organik:#83C267; --c-kertas:#D7A76C; --c-plastik:#72A9F0; --c-logam:#AAB4BF; --c-residu:#C9CCCB;
+  --shadow-sm:0 1px 2px rgba(0,0,0,.3); --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.25); --shadow-lg:0 12px 40px rgba(0,0,0,.5);
+  color-scheme:dark}
+*{box-sizing:border-box}
+html,body{min-height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-ui);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3{margin:0;text-wrap:balance;line-height:1.2}
+h1{font-size:1.55rem;font-weight:800;letter-spacing:-.02em}
+h2{font-size:1.02rem;font-weight:750}
+h3{font-size:.92rem;font-weight:700}
+p{margin:0}
+a{color:var(--accent)}
+.mono{font-family:var(--f-mono)}
+.num{font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.small{font-size:.82rem}
+.eyebrow{font-size:.7rem;letter-spacing:.09em;text-transform:uppercase;font-weight:750;color:var(--muted)}
+:focus-visible{outline:2.5px solid var(--accent);outline-offset:2px}
+svg.i{width:20px;height:20px;flex:none}
+
+/* ---------- shell ---------- */
+.shell{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh}
+.side{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:22px;padding:22px 14px;background:var(--surface);border-right:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:11px;padding:0 8px}
+.logo{width:38px;height:38px;border-radius:11px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;flex:none}
+.logo svg{width:22px;height:22px}
+.brand b{display:block;font-size:.95rem;font-weight:800;letter-spacing:-.01em;line-height:1.15}
+.brand span{font-size:.72rem;color:var(--muted)}
+.nav{display:flex;flex-direction:column;gap:3px}
+.nav a{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;color:var(--fg);text-decoration:none;font-weight:650;font-size:.93rem}
+.nav a:hover{background:var(--surface-2)}
+.nav a[aria-current="page"]{background:var(--accent-soft);color:var(--accent)}
+.nav a.cta{background:var(--accent);color:var(--accent-ink);margin-bottom:8px;justify-content:center;font-weight:750}
+.nav a.cta:hover{background:var(--accent-hover)}
+.nav a.cta[aria-current="page"]{box-shadow:0 0 0 3px var(--accent-soft)}
+.side-foot{margin-top:auto;display:flex;flex-direction:column;gap:10px}
+.me{display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;background:var(--surface-2);text-decoration:none;color:var(--fg)}
+.avatar{width:36px;height:36px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-weight:800;font-size:.85rem;flex:none;text-transform:uppercase}
+.me .who{min-width:0;display:flex;flex-direction:column;line-height:1.25}
+.me .who b{font-size:.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.me .who span{font-size:.74rem;color:var(--muted)}
+main{min-width:0;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px));padding-block:22px 48px}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.topbar{display:none}
+.tabbar{display:none}
+.pagehead{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+.pagehead .t{display:flex;flex-direction:column;gap:3px;min-width:0}
+.pagehead .t p{color:var(--muted);font-size:.9rem}
+.projpick{display:flex;align-items:center;gap:8px}
+.projpick select{width:auto;max-width:260px}
+
+/* ---------- controls ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:0 16px;border-radius:11px;border:1px solid var(--line);background:var(--surface);font-weight:680;font-size:.9rem;cursor:pointer;text-decoration:none;color:var(--fg);white-space:nowrap;transition:background .12s,border-color .12s,transform .06s}
+.btn:hover{background:var(--surface-2)}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+.btn.soft{background:var(--accent-soft);border-color:transparent;color:var(--accent)}
+.btn.danger{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 35%,var(--line))}
+.btn.danger.solid{background:var(--bad);border-color:var(--bad);color:#fff}
+.btn.ghost{border-color:transparent;background:transparent}
+.btn.ghost:hover{background:var(--surface-2)}
+.btn.sm{min-height:34px;padding:0 11px;font-size:.82rem;border-radius:9px}
+.btn.lg{min-height:52px;padding:0 22px;font-size:1rem;border-radius:13px}
+.btn.block{width:100%}
+.btn[disabled]{opacity:.45;cursor:not-allowed;transform:none}
+.btn svg{width:18px;height:18px}
+.iconbtn{width:42px;height:42px;padding:0;border-radius:12px}
+.field{display:flex;flex-direction:column;gap:6px;font-size:.8rem;font-weight:680;color:var(--muted);min-width:0}
+.field .hint{font-weight:500;font-size:.76rem}
+input[type=text],input[type=password],input[type=number],input[type=date],input[type=search],select,textarea{width:100%;min-height:44px;padding:9px 12px;border:1px solid var(--line);border-radius:11px;background:var(--surface);color:var(--fg);font-size:.95rem;font-weight:550}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+textarea{min-height:68px;resize:vertical}
+.seg{display:flex;background:var(--surface-2);border-radius:12px;padding:4px;gap:4px}
+.seg button{flex:1;border:0;background:transparent;padding:8px 12px;border-radius:9px;font-weight:680;font-size:.86rem;cursor:pointer;color:var(--muted);min-height:38px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.2}
+.seg button small{font-family:var(--f-mono);font-size:.7rem;font-weight:600;opacity:.8}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--fg);box-shadow:var(--shadow-sm)}
+.seg.inline{display:inline-flex}
+.seg.inline button{flex:none}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:.76rem;font-weight:680;background:var(--surface-2);color:var(--muted);white-space:nowrap}
+.chip .dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+.chip.ok{background:var(--ok-soft);color:var(--ok)}
+.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.bad{background:var(--bad-soft);color:var(--bad)}
+.chip.acc{background:var(--accent-soft);color:var(--accent)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0;box-shadow:var(--shadow-sm)}
+.card-h{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.card-h .lead{display:flex;align-items:center;gap:10px}
+.step{width:26px;height:26px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-weight:800;font-size:.8rem;flex:none}
+.step.done{background:var(--accent);color:var(--accent-ink)}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.stack{display:flex;flex-direction:column;gap:10px}
+.note{font-size:.85rem;padding:11px 13px;border-radius:11px;background:var(--surface-2);color:var(--muted)}
+.note.warn{background:var(--warn-soft);color:var(--warn)}
+.note.bad{background:var(--bad-soft);color:var(--bad)}
+.note.ok{background:var(--ok-soft);color:var(--ok)}
+.note.acc{background:var(--accent-soft);color:var(--accent)}
+.note b{color:inherit}
+hr.sep{border:0;border-top:1px solid var(--line);margin:0;width:100%}
+dl.kv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 14px;margin:0;font-size:.84rem}
+dl.kv dt{color:var(--muted);font-weight:600}
+dl.kv dd{margin:0;word-break:break-word;font-variant-numeric:tabular-nums}
+.cls{--c:var(--muted)}
+.cls-organik{--c:var(--c-organik)} .cls-kertas{--c:var(--c-kertas)} .cls-plastik{--c:var(--c-plastik)} .cls-logam{--c:var(--c-logam)} .cls-residu{--c:var(--c-residu)}
+.spin{width:16px;height:16px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--accent);animation:sp .8s linear infinite;display:inline-block;flex:none}
+@keyframes sp{to{transform:rotate(360deg)}}
+.progress{height:8px;background:var(--surface-3);border-radius:4px;overflow:hidden}
+.progress span{display:block;height:100%;background:var(--accent);border-radius:4px;transition:width .2s}
+
+/* ---------- dashboard ---------- */
+.hero{display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap;padding:22px;border-radius:var(--r);background:var(--accent);color:var(--accent-ink);box-shadow:var(--shadow)}
+.hero h2{font-size:1.25rem;font-weight:800}
+.hero p{opacity:.88;font-size:.9rem}
+.hero .progress{background:color-mix(in srgb,var(--accent-ink) 25%,transparent);width:min(440px,70vw);margin-top:6px}
+.hero .progress span{background:var(--accent-ink)}
+.hero .btn{background:var(--accent-ink);color:var(--accent);border-color:var(--accent-ink)}
+.hero .btn:hover{filter:brightness(.96)}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-sm);padding:14px 16px;display:flex;flex-direction:column;gap:3px;min-width:0;box-shadow:var(--shadow-sm)}
+.kpi b{font-size:1.75rem;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1.15}
+.kpi span{font-size:.78rem;color:var(--muted);font-weight:650}
+.bars{display:flex;flex-direction:column;gap:13px}
+.bar-row{display:grid;grid-template-columns:96px minmax(0,1fr) 120px;gap:12px;align-items:center;font-size:.87rem}
+.bar-row .lbl{font-weight:700;display:flex;align-items:center;gap:8px;min-width:0}
+.bar-row .lbl i{width:10px;height:10px;border-radius:3px;background:var(--c);flex:none}
+.track{position:relative;height:12px;background:var(--surface-2);border-radius:6px;overflow:hidden}
+.track .fill{position:absolute;inset:0 auto 0 0;background:var(--c);border-radius:6px}
+.track .tick{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--fg);opacity:.45}
+.bar-row .val{text-align:right;font-variant-numeric:tabular-nums;color:var(--muted);font-size:.8rem}
+.bar-row .val b{color:var(--fg)}
+table.t{width:100%;border-collapse:collapse;font-size:.86rem}
+table.t th{text-align:left;font-size:.7rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:750;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+table.t td{padding:9px 10px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;vertical-align:middle}
+table.t tr:last-child td{border-bottom:0}
+table.t tr.click{cursor:pointer}
+table.t tr.click:hover td{background:var(--surface-2)}
+.tscroll{overflow-x:auto}
+.issues{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}
+.issues li{display:flex;gap:10px;align-items:flex-start;font-size:.88rem}
+.sev{width:4px;align-self:stretch;border-radius:2px;flex:none;background:var(--warn)}
+.sev.bad{background:var(--bad)} .sev.ok{background:var(--ok)} .sev.info{background:var(--accent)}
+
+/* ---------- capture ---------- */
+.capture{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:16px;align-items:start}
+.capture .col{display:flex;flex-direction:column;gap:16px;min-width:0}
+.locwrap{position:relative}
+.loctoken{font-family:var(--f-mono);font-weight:600;color:var(--fg)}
+.whoami{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:11px;background:var(--surface-2)}
+.whoami .code{font-family:var(--f-mono);font-weight:700;font-size:1rem;color:var(--accent)}
+.stage{position:relative;aspect-ratio:4/3;width:100%;max-width:100%;border-radius:14px;background:var(--surface-2);border:2px dashed var(--line);overflow:hidden;display:grid;place-items:center}
+.stage.has{border:0;background:#0A0F0D}
+.stage img.shot{width:100%;height:100%;object-fit:contain}
+.stage .empty{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;padding:22px}
+.stage .bigcam{width:76px;height:76px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;border:0;cursor:pointer;box-shadow:0 6px 18px color-mix(in srgb,var(--accent) 40%,transparent)}
+.stage .bigcam svg{width:34px;height:34px}
+.stage .badges{position:absolute;left:10px;top:10px;right:10px;display:flex;gap:6px;flex-wrap:wrap}
+.stage .badges .chip{background:rgba(0,0,0,.62);color:#fff}
+.stage .badges .chip.warn{background:#9A5800;color:#fff}
+.stage.auto{aspect-ratio:auto;border-style:solid;border-width:1px;background:var(--ok-soft)}
+.saved{display:flex;flex-direction:column;gap:12px;align-items:stretch;text-align:left;width:100%;padding:18px;min-width:0}
+.saved .head{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:center}
+.saved .btn{white-space:normal;text-align:center;line-height:1.25;padding-block:10px}
+.saved .ok-ic{width:44px;height:44px;border-radius:50%;background:var(--ok-soft);color:var(--ok);display:grid;place-items:center}
+.objchoice{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.objbtn{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:13px 14px;border-radius:13px;border:1.5px solid var(--line);background:var(--surface);cursor:pointer;text-align:left;min-height:74px}
+.objbtn b{font-size:.95rem}
+.objbtn span{font-size:.78rem;color:var(--muted)}
+.objbtn .big{font-family:var(--f-mono);font-size:1.05rem;font-weight:700;color:var(--accent)}
+.objbtn[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent)}
+.glist{display:flex;flex-direction:column;gap:7px;max-height:290px;overflow:auto;padding:2px}
+.gitem{display:flex;gap:11px;align-items:center;padding:7px 9px;border:1px solid var(--line);border-radius:12px;background:var(--surface);cursor:pointer;text-align:left;width:100%}
+.gitem:hover{background:var(--surface-2)}
+.gitem[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.gitem .th{width:48px;height:48px;border-radius:9px;background:var(--surface-3);overflow:hidden;flex:none;border-bottom:3px solid var(--c)}
+.gitem .th img{width:100%;height:100%;object-fit:cover}
+.gitem .gi{display:flex;flex-direction:column;min-width:0;flex:1;line-height:1.3}
+.gitem .gi b{font-family:var(--f-mono);font-size:.95rem}
+.gitem .gi span{font-size:.76rem;color:var(--muted)}
+.clsgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:9px}
+.clsbtn{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:5px;padding:11px 12px;border-radius:13px;border:1.5px solid var(--line);background:var(--surface);cursor:pointer;text-align:left;min-height:68px}
+.clsbtn b{font-weight:750;font-size:.93rem;display:flex;align-items:center;gap:8px;color:var(--fg)}
+.clsbtn b i{width:11px;height:11px;border-radius:4px;background:var(--c)}
+.clsbtn .conf{font-size:.72rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.clsbtn .cbar{height:4px;width:100%;background:var(--surface-2);border-radius:2px;overflow:hidden}
+.clsbtn .cbar span{display:block;height:100%;background:var(--c)}
+.clsbtn[aria-pressed="true"]{border-color:var(--c);background:color-mix(in srgb,var(--c) 11%,var(--surface));box-shadow:inset 0 0 0 1px var(--c)}
+.clsbtn .ai{position:absolute;right:9px;top:9px;font-size:.6rem;font-weight:800;letter-spacing:.07em;color:var(--accent);background:var(--accent-soft);padding:1px 5px;border-radius:5px}
+.clsbtn[disabled]{opacity:.42;cursor:not-allowed}
+.namecard{border:1.5px solid var(--accent-line);background:color-mix(in srgb,var(--accent-soft) 45%,var(--surface))}
+.fname{display:flex;flex-wrap:wrap;align-items:flex-start;gap:2px;font-family:var(--f-mono);font-size:1rem;row-gap:8px}
+.fname .tok{display:flex;flex-direction:column;align-items:center;gap:2px}
+.fname .tok code{font-family:inherit;padding:4px 7px;border-radius:7px;background:var(--surface);border:1px solid var(--line);font-weight:650}
+.fname .tok.miss code{color:var(--bad);background:var(--bad-soft);border-color:transparent}
+.fname .tok.proj code{border-style:dashed;border-color:var(--accent)}
+.fname .tok small{font-family:var(--f-ui);font-size:.6rem;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;font-weight:750}
+.fname .sepc{padding-top:5px;color:var(--muted)}
+.errs{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;font-size:.84rem;color:var(--bad)}
+.errs li::before{content:"• "}
+.recent{display:flex;gap:9px;overflow-x:auto;padding-bottom:4px}
+.recent figure{margin:0;flex:none;width:120px;display:flex;flex-direction:column;gap:5px}
+.recent figure .th{width:120px;height:90px;border-radius:10px;overflow:hidden;background:var(--surface-2)}
+.recent figure .th img{width:100%;height:100%;object-fit:cover}
+.recent figcaption{font-family:var(--f-mono);font-size:.6rem;color:var(--muted);word-break:break-all;line-height:1.35}
+
+/* camera overlay */
+.cam{position:fixed;inset:0;z-index:90;background:#000;display:flex;flex-direction:column;color:#fff}
+.cam video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.cam .guide{position:absolute;left:50%;top:50%;width:min(68vw,68vh);aspect-ratio:1;transform:translate(-50%,-50%);border:2px solid rgba(255,255,255,.75);border-radius:18px;box-shadow:0 0 0 9999px rgba(0,0,0,.28);pointer-events:none}
+.cam .guide span{position:absolute;left:50%;top:-30px;transform:translateX(-50%);font-size:.75rem;font-weight:650;background:rgba(0,0,0,.5);padding:3px 10px;border-radius:999px;white-space:nowrap}
+.cam .bar{position:relative;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:calc(12px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 12px max(16px,env(safe-area-inset-left,0px));background:linear-gradient(rgba(0,0,0,.55),transparent)}
+.cam .bar b{font-size:.95rem}
+.cam .bot{position:relative;z-index:2;margin-top:auto;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:20px max(24px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) max(24px,env(safe-area-inset-left,0px));background:linear-gradient(transparent,rgba(0,0,0,.6))}
+.cam .rb{width:48px;height:48px;border-radius:50%;border:0;background:rgba(255,255,255,.18);color:#fff;display:grid;place-items:center;cursor:pointer}
+.cam .rb svg{width:22px;height:22px}
+.cam .shutter{width:78px;height:78px;border-radius:50%;border:4px solid #fff;background:rgba(255,255,255,.25);cursor:pointer;padding:5px}
+.cam .shutter::after{content:"";display:block;width:100%;height:100%;border-radius:50%;background:#fff}
+.cam .shutter:active::after{transform:scale(.92)}
+.cam .msg{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:24px;z-index:1}
+.cam .flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:3}
+.cam .flash.on{animation:fl .25s ease-out}
+@keyframes fl{0%{opacity:.85}100%{opacity:0}}
+
+/* ---------- gallery ---------- */
+.filters{display:grid;grid-template-columns:minmax(0,2fr) repeat(5,minmax(0,1fr));gap:8px}
+.gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(172px,1fr));gap:12px}
+.tile{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--surface);cursor:pointer;text-align:left;padding:0;box-shadow:var(--shadow-sm)}
+.tile:hover{box-shadow:var(--shadow)}
+.tile .th{aspect-ratio:4/3;background:var(--surface-2);position:relative;width:100%}
+.tile .th img{width:100%;height:100%;object-fit:cover;display:block}
+.tile .th .chip{position:absolute;left:7px;top:7px;background:rgba(0,0,0,.6);color:#fff}
+.tile .th .st{position:absolute;right:7px;top:7px}
+.tile .meta{padding:9px 10px;display:flex;flex-direction:column;gap:3px;border-top:3px solid var(--c)}
+.tile .meta code{font-family:var(--f-mono);font-size:.64rem;word-break:break-all;color:var(--muted);line-height:1.4}
+.empty-state{display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;padding:44px 18px;border:2px dashed var(--line);border-radius:var(--r);color:var(--muted)}
+.empty-state h2{color:var(--fg)}
+.empty-state .ic{width:56px;height:56px;border-radius:16px;background:var(--surface-2);display:grid;place-items:center;color:var(--muted)}
+.empty-state .ic svg{width:28px;height:28px}
+
+/* ---------- modal / sheet ---------- */
+.modal{position:fixed;inset:0;z-index:70;background:rgba(6,12,10,.55);display:flex;justify-content:center;align-items:flex-start;overflow:auto;padding:calc(20px + env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
+.sheet{width:min(1020px,100%);background:var(--surface);border-radius:18px;border:1px solid var(--line);display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);overflow:hidden;box-shadow:var(--shadow-lg)}
+.sheet .pic{background:#0A0F0D;display:grid;place-items:center;min-height:300px}
+.sheet .pic img{max-width:100%;max-height:74vh;object-fit:contain}
+.sheet .side2{padding:18px;display:flex;flex-direction:column;gap:13px;min-width:0}
+.fname-plain{font-family:var(--f-mono);font-size:.84rem;word-break:break-all;padding:9px 11px;border-radius:9px;background:var(--surface-2)}
+.grpstrip{display:flex;gap:7px;overflow-x:auto}
+.grpstrip button{flex:none;width:60px;height:48px;border-radius:8px;overflow:hidden;border:2px solid transparent;padding:0;background:var(--surface-2);cursor:pointer;position:relative}
+.grpstrip button[aria-current="true"]{border-color:var(--accent)}
+.grpstrip button img{width:100%;height:100%;object-fit:cover}
+.grpstrip button span{position:absolute;right:3px;bottom:2px;font-size:.6rem;background:rgba(0,0,0,.65);color:#fff;padding:0 4px;border-radius:4px;font-family:var(--f-mono)}
+
+/* ---------- settings ---------- */
+.subnav{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
+.subnav button{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 15px;font-weight:680;font-size:.87rem;cursor:pointer;color:var(--muted);display:flex;align-items:center;gap:7px}
+.subnav button svg{width:17px;height:17px}
+.subnav button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.users{display:flex;flex-direction:column;gap:10px}
+.user{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.user.off{opacity:.6}
+.user .who{display:flex;flex-direction:column;min-width:0;line-height:1.3}
+.user .who b{font-size:.95rem}
+.user .who span{font-size:.8rem;color:var(--muted)}
+.user .acts{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.user .edit{grid-column:1/-1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;padding-top:6px;border-top:1px solid var(--line)}
+.cred{font-family:var(--f-mono);font-size:.9rem;white-space:pre-wrap;padding:12px;border-radius:11px;background:var(--surface);border:1px dashed var(--accent)}
+.catrow{display:grid;grid-template-columns:14px 100px minmax(0,1fr) minmax(0,2fr) auto auto;gap:9px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)}
+.catrow:last-child{border-bottom:0}
+.catrow i{width:14px;height:14px;border-radius:4px;background:var(--c)}
+.taglist{display:flex;flex-wrap:wrap;gap:7px}
+.tag{display:inline-flex;align-items:center;gap:6px;padding:5px 6px 5px 11px;border-radius:9px;background:var(--surface-2);font-size:.85rem;font-weight:600}
+.tag code{font-family:var(--f-mono);font-size:.8rem}
+.tag button{border:0;background:transparent;cursor:pointer;color:var(--muted);padding:2px 5px;border-radius:5px;font-size:1rem;line-height:1}
+.tag button:hover{color:var(--bad);background:var(--bad-soft)}
+.addrow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) auto;gap:8px;align-items:end}
+.pw{position:relative}
+.pw input{padding-right:46px}
+.pw button{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:38px;height:36px;border:0;background:transparent;color:var(--muted);cursor:pointer;border-radius:8px;display:grid;place-items:center}
+.pw button svg{width:19px;height:19px}
+
+/* ---------- auth ---------- */
+.auth{min-height:100vh;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr)}
+.auth .art{background:var(--accent);color:var(--accent-ink);padding:48px max(40px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;justify-content:space-between;gap:30px;position:relative;overflow:hidden}
+.auth .art .logo{background:var(--accent-ink);color:var(--accent)}
+.auth .art h1{font-size:2.3rem;line-height:1.1;max-width:15ch}
+.auth .art p{opacity:.88;max-width:42ch}
+.auth .art .sample{font-family:var(--f-mono);font-size:.82rem;background:color-mix(in srgb,#000 22%,transparent);padding:14px 16px;border-radius:14px;line-height:1.75;word-break:break-all}
+.auth .art .sample b{color:#FFE6A8;font-weight:650}
+.auth .art .dots{position:absolute;right:-60px;top:-60px;width:280px;height:280px;border-radius:50%;border:40px solid color-mix(in srgb,var(--accent-ink) 9%,transparent)}
+.auth .form{display:grid;place-items:center;padding:32px max(20px,env(safe-area-inset-right,0px)) 32px max(20px,env(safe-area-inset-left,0px))}
+.auth .box{width:min(400px,100%);display:flex;flex-direction:column;gap:18px}
+.auth .box form{display:flex;flex-direction:column;gap:13px}
+
+/* ---------- toasts ---------- */
+.toasts{position:fixed;z-index:120;left:50%;transform:translateX(-50%);bottom:calc(24px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:8px;align-items:center;width:min(560px,calc(100% - 32px));pointer-events:none}
+.toast{pointer-events:auto;background:var(--fg);color:var(--bg);padding:12px 16px;border-radius:12px;font-size:.88rem;font-weight:620;box-shadow:var(--shadow-lg);max-width:100%;word-break:break-word}
+.toast.bad{background:var(--bad);color:#fff}
+.toast.ok{background:var(--ok);color:#fff}
+.boot{min-height:70vh;display:grid;place-items:center;color:var(--muted)}
+
+/* ---------- responsive ---------- */
+@media (max-width:1100px){
+  .filters{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .filters .q{grid-column:1/-1}
+}
+@media (max-width:900px){
+  .shell{grid-template-columns:1fr}
+  .side{display:none}
+  .topbar{display:flex;position:sticky;top:env(safe-area-inset-top,0px);z-index:40;align-items:center;justify-content:space-between;gap:10px;padding:10px max(16px,env(safe-area-inset-right,0px)) 10px max(16px,env(safe-area-inset-left,0px));background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:41;background:var(--bg)}
+  .topbar .brand{padding:0}
+  .topbar .avatar{width:34px;height:34px}
+  main{padding-block:16px calc(104px + env(safe-area-inset-bottom,0px));padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .tabbar{display:grid;grid-template-columns:repeat(5,1fr);align-items:end;position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--surface);border-top:1px solid var(--line);padding:6px max(6px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(6px,env(safe-area-inset-left,0px));box-shadow:0 -4px 18px rgba(0,0,0,.05)}
+  .tabbar a{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 2px;border-radius:10px;color:var(--muted);text-decoration:none;font-size:.68rem;font-weight:700}
+  .tabbar a svg{width:23px;height:23px}
+  .tabbar a[aria-current="page"]{color:var(--accent)}
+  .tabbar a.cam-tab{position:relative;top:-14px}
+  .tabbar a.cam-tab .fab{width:58px;height:58px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;box-shadow:0 6px 16px color-mix(in srgb,var(--accent) 45%,transparent);border:4px solid var(--surface)}
+  .tabbar a.cam-tab .fab svg{width:26px;height:26px}
+  .capture{grid-template-columns:1fr}
+  .grid2,.grid3{grid-template-columns:1fr}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .sheet{grid-template-columns:1fr}
+  .auth{grid-template-columns:1fr}
+  .auth .art{padding:32px max(20px,env(safe-area-inset-left,0px)) 28px;gap:18px}
+  .auth .art h1{font-size:1.7rem}
+  .auth .art .sample,.auth .art .why{display:none}
+  .catrow{grid-template-columns:14px minmax(0,1fr) auto auto}
+  .catrow .cr-desc{grid-column:2/-1}
+  .catrow code{display:none}
+  .user .edit{grid-template-columns:1fr 1fr}
+  .toasts{bottom:calc(94px + env(safe-area-inset-bottom,0px))}
+  h1{font-size:1.35rem}
+  .pagehead .projpick{width:100%}
+  .pagehead .projpick select{max-width:none;width:100%}
+}
+@media (max-width:520px){
+  .filters{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .bar-row{grid-template-columns:76px minmax(0,1fr)}
+  .bar-row .val{grid-column:2;text-align:left;margin-top:-7px}
+  .addrow{grid-template-columns:1fr}
+  .gal{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+  .objchoice{grid-template-columns:1fr 1fr}
+  .user{grid-template-columns:auto minmax(0,1fr)}
+  .user .acts{grid-column:1/-1;justify-content:flex-start}
+  .user .edit{grid-template-columns:1fr}
+  .card{padding:15px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+</style>
+<script src="config.js"></script>
+<script src="vendor/supabase.js"></script>
+</head>
+<body>
+<div id="authroot"><div class="boot"><div class="row"><span class="spin"></span> Memuat…</div></div></div>
+<div class="shell" id="shell" hidden>
+  <aside class="side" aria-label="Navigasi utama">
+    <div class="brand"><div class="logo"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3.2"/></svg></div><div><b>Dataset Collector</b><span>Pengumpulan citra berlabel</span></div></div>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot" id="sidefoot"></div>
+  </aside>
+  <div style="min-width:0">
+    <header class="topbar"><div class="brand"><div class="logo" style="width:32px;height:32px;border-radius:9px"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="width:19px;height:19px"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3.2"/></svg></div><b>Dataset Collector</b></div><div id="topme"></div></header>
+    <main><div class="wrap" id="app"></div></main>
+  </div>
+</div>
+<nav class="tabbar" id="tabbar" hidden aria-label="Navigasi"></nav>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<div id="modalroot"></div>
+<div id="camroot"></div>
+<input type="file" id="fileCam" accept="image/*" capture="environment" hidden>
+<input type="file" id="fileLib" accept="image/*" hidden>
+
+<script>
+"use strict";
+/*PURE-START*/
+const DEFAULT_CATS=[
+  {code:"organik",name:"Organik",desc:"sisa makanan, kulit buah, daun, ranting, ampas kopi/teh",active:true},
+  {code:"kertas",name:"Kertas",desc:"kertas, kardus, karton, koran, tisu kering, kemasan kertas",active:true},
+  {code:"plastik",name:"Plastik",desc:"botol/gelas plastik, kantong plastik, sedotan, kemasan plastik, styrofoam",active:true},
+  {code:"logam",name:"Logam",desc:"kaleng minuman/makanan, tutup botol logam, aluminium foil, paku, kawat",active:true},
+  {code:"residu",name:"Residu",desc:"sampah campuran/kotor yang tidak bisa didaur ulang: popok, puntung rokok, kemasan sachet, masker",active:true}
+];
+const DEFAULT_LIGHTS=[{code:"in",label:"Dalam ruangan"},{code:"out",label:"Luar ruangan"}];
+function pad4(n){return String(n).padStart(4,"0")}
+function ymd(d){const z=x=>String(x).padStart(2,"0");return d.getFullYear()+z(d.getMonth()+1)+z(d.getDate())}
+function todayIso(){const d=new Date(),z=x=>String(x).padStart(2,"0");return d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate())}
+function isoToYmd(s){return (s||"").replace(/-/g,"")}
+function normLoc(s){return String(s||"").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]/g,"").slice(0,40)}
+function codeToken(s){return String(s||"").toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,10)}
+function normUser(s){return String(s||"").trim().toLowerCase()}
+const USER_RE=/^[a-z0-9][a-z0-9._-]{2,29}$/;
+function usernameFrom(name){return String(name||"").toLowerCase().normalize("NFKD").replace(/[^a-z0-9 ._-]/g,"").trim().split(/\s+/).slice(0,2).join(".").slice(0,30)}
+function nextPhotographerCode(codes){let max=0;for(const c of codes){const m=/^FA(\d+)$/.exec(c||"");if(m)max=Math.max(max,+m[1])}return "FA"+String(max+1).padStart(2,"0")}
+function validYmd(s){
+  if(!/^\d{8}$/.test(s||""))return false;
+  const y=+s.slice(0,4),m=+s.slice(4,6),d=+s.slice(6),dt=new Date(y,m-1,d);
+  return y>=2000&&y<=2100&&dt.getFullYear()===y&&dt.getMonth()===m-1&&dt.getDate()===d;
+}
+const FILENAME_RE=/^[a-z0-9]+_[a-z0-9]+_[a-z0-9]+_\d{8}_[A-Z0-9]+_\d{4}_[1-9]\d*\.jpg$/;
+/* Filename from metadata: <kelas>_<lokasi>_<cahaya>_<YYYYMMDD>_<fotografer>_<idobjek>_<ulangan>.jpg */
+function buildFilename(p,cfg){
+  const errors=[];
+  const cats=(cfg.categories||[]).filter(c=>c.active!==false).map(c=>c.code);
+  const lights=(cfg.lightings||DEFAULT_LIGHTS).map(l=>l.code);
+  if(!p.category)errors.push("Pilih kategori objek.");
+  else if(!cats.includes(p.category))errors.push("Kategori “"+p.category+"” tidak terdaftar atau nonaktif.");
+  if(!p.location)errors.push("Ketik lokasi pengambilan.");
+  if(!p.lighting)errors.push("Pilih kondisi cahaya.");
+  else if(!lights.includes(p.lighting))errors.push("Kode cahaya “"+p.lighting+"” tidak terdaftar.");
+  if(!validYmd(p.date))errors.push("Tanggal pengambilan tidak valid.");
+  if(!p.photographer)errors.push("Akun ini belum punya kode fotografer.");
+  if(p.code==null||p.code==="")errors.push("Pilih “Objek baru” atau objek yang difoto ulang.");
+  else if(!/^\d{4}$/.test(p.code)||p.code==="0000")errors.push("ID objek harus empat digit, 0001–9999.");
+  if(!(Number.isInteger(p.rep)&&p.rep>=1))errors.push("Nomor ulangan harus mulai dari 1.");
+  const parts=[
+    {label:"kelas",value:p.category||"",miss:!p.category},
+    {label:"lokasi",value:p.location||"",miss:!p.location},
+    {label:"cahaya",value:p.lighting||"",miss:!p.lighting},
+    {label:"tanggal",value:p.date||"",miss:!validYmd(p.date)},
+    {label:"fotografer",value:p.photographer||"",miss:!p.photographer},
+    {label:"id objek",value:p.code||"",miss:!p.code,proj:!!p.codeProjected},
+    {label:"ulangan",value:p.rep?String(p.rep):"",miss:!p.rep,proj:!!p.repProjected}
+  ];
+  let name=null;
+  if(!errors.length){
+    name=[p.category,p.location,p.lighting,p.date,p.photographer,p.code,p.rep].join("_")+".jpg";
+    if(!FILENAME_RE.test(name)){errors.push("Nama berkas mengandung karakter yang tidak aman.");name=null}
+  }
+  return {ok:!errors.length,name,errors,parts};
+}
+function nextCode(groups,counter){let max=counter||0;for(const g of groups){const n=parseInt(g.code,10);if(n>max)max=n}return max+1}
+function strHash(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+/* Whole physical objects go to one split; stratified by category. */
+function splitGroups(groups,ratios,seed){
+  const rnd=mulberry32(strHash(String(seed)));const byKey=new Map();
+  for(const g of groups){const k=g.category||"__none";if(!byKey.has(k))byKey.set(k,[]);byKey.get(k).push(g)}
+  const out=new Map(),tot=(ratios.train+ratios.val+ratios.test)||1;
+  for(const k of [...byKey.keys()].sort()){
+    const arr=byKey.get(k).slice().sort((a,b)=>a.id<b.id?-1:1);
+    for(let i=arr.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]]}
+    const n=arr.length;let nTest=Math.round(n*ratios.test/tot),nVal=Math.round(n*ratios.val/tot);
+    if(n>=3){if(ratios.test>0&&nTest===0)nTest=1;if(ratios.val>0&&nVal===0)nVal=1}
+    else if(n===2){nVal=0;nTest=ratios.test>0?1:0}else{nVal=0;nTest=0}
+    while(nTest+nVal>=n&&n>0){if(nVal>0)nVal--;else nTest--}
+    arr.forEach((g,i)=>out.set(g.id,i<n-nTest-nVal?"train":(i<n-nTest?"val":"test")));
+  }
+  return out;
+}
+const POP=[0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4];
+function hamming(a,b){if(!a||!b||a.length!==b.length)return 99;let d=0;for(let i=0;i<a.length;i++)d+=POP[parseInt(a[i],16)^parseInt(b[i],16)];return d}
+function csvCell(v){if(v==null)return "";const s=Array.isArray(v)?v.join("|"):String(v);return /[",\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
+function toCSV(rows,cols){return [cols.join(","),...rows.map(r=>cols.map(c=>csvCell(r[c])).join(","))].join("\r\n")+"\r\n"}
+/*PURE-END*/
+
+/* ---------- helpers ---------- */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const uid=()=>(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2,10));
+const fmtInt=n=>new Intl.NumberFormat("id-ID").format(n||0);
+const fmtDate=s=>{if(!s)return "–";const d=new Date(s);return isNaN(d)?s:d.toLocaleString("id-ID",{dateStyle:"medium",timeStyle:"short"})};
+const fmtYmd=s=>validYmd(s)?new Date(+s.slice(0,4),+s.slice(4,6)-1,+s.slice(6)).toLocaleDateString("id-ID",{day:"numeric",month:"short",year:"numeric"}):s||"–";
+const ls={get(k,d){try{const v=localStorage.getItem("adc:"+k);return v==null?d:JSON.parse(v)}catch{return d}},set(k,v){try{localStorage.setItem("adc:"+k,JSON.stringify(v))}catch{}}};
+function toast(msg,kind){const el=document.createElement("div");el.className="toast"+(kind?" "+kind:"");el.textContent=msg;$("#toasts").append(el);setTimeout(()=>el.remove(),kind==="bad"?6500:3400)}
+function errMsg(e){const m=(e&&(e.message||e.error_description||e.code))||String(e||"kesalahan tak dikenal");return /Failed to fetch|NetworkError|Load failed/i.test(m)?"Tidak ada koneksi internet.":m.replace(/\.$/,"")+"."}
+function clsOf(code){return ["organik","kertas","plastik","logam","residu"].includes(code)?"cls-"+code:""}
+function clsStyle(code){if(clsOf(code))return "";const hues=[18,190,280,330,48,150];return `--c:hsl(${hues[strHash(code||"x")%hues.length]} 55% 45%);`}
+function initials(p){const n=(p&&(p.full_name||p.username))||"?";return n.split(/[\s._-]+/).filter(Boolean).slice(0,2).map(x=>x[0]).join("")}
+const ROLE_LABEL={admin:"Admin",pemeriksa:"Pemeriksa",pengumpul:"Pengumpul"};
+const ROLE_DESC={admin:"Mengatur proyek dan pengguna, plus semua hak pemeriksa.",pemeriksa:"Memverifikasi, mengoreksi label, dan menghapus foto.",pengumpul:"Mengambil dan menyimpan foto."};
+const can=min=>({admin:3,pemeriksa:2,pengumpul:1}[S.role]||0)>=({admin:3,pemeriksa:2,pengumpul:1}[min]);
+const ic=(d,extra="")=>`<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" ${extra}>${d}</svg>`;
+const ICON={
+  logo:ic('<path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3.2"/>'),
+  home:ic('<path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>'),
+  cam:ic('<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.8"/>'),
+  grid:ic('<rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/>'),
+  box:ic('<path d="M12 3v12m0 0-4-4m4 4 4-4"/><path d="M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/>'),
+  gear:ic('<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>'),
+  img:ic('<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/>'),
+  copy:ic('<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/>'),
+  redo:ic('<path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.5"/><path d="M4 4v4.5h4.5"/>'),
+  flip:ic('<path d="M17 3l3 3-3 3"/><path d="M20 6H8a4 4 0 0 0-4 4v1"/><path d="M7 21l-3-3 3-3"/><path d="M4 18h12a4 4 0 0 0 4-4v-1"/>'),
+  x:ic('<path d="M6 6l12 12M18 6 6 18"/>'),
+  check:ic('<path d="m5 12.5 4.5 4.5L19 7.5"/>'),
+  users:ic('<circle cx="9" cy="8" r="3.2"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M16 4.5a3.2 3.2 0 0 1 0 6.3M21 20a6 6 0 0 0-3.5-5.4"/>'),
+  user:ic('<circle cx="12" cy="8" r="3.6"/><path d="M5 20a7 7 0 0 1 14 0"/>'),
+  key:ic('<circle cx="8" cy="15" r="4"/><path d="m11 12 8-8m-3 3 2 2"/>'),
+  logout:ic('<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 17l-5-5 5-5M5 12h11"/>'),
+  ai:ic('<path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><rect x="7" y="7" width="10" height="10" rx="2.5"/><path d="M10 10h4v4h-4z"/>'),
+  folder:ic('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'),
+  eye:ic('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>'),
+  eyeoff:ic('<path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4M6.2 6.3C3.6 8 2 12 2 12s3.6 7 10 7a9.6 9.6 0 0 0 4.4-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>'),
+  plus:ic('<path d="M12 5v14M5 12h14"/>'),
+  ok:ic('<circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/>')
+};
+
+/* ---------- config ---------- */
+const CFG=window.ADC_CONFIG||{};
+const LOGIN_DOMAIN=CFG.loginDomain||"dataset-collector.app";
+const IS_PREVIEW=!!CFG.preview;
+const IS_ARTIFACT=!!(window.claude&&typeof window.claude.use==="function");
+
+/* ---------- local AI (ONNX Runtime Web, runs on this device) ---------- */
+const AI_CFG={
+  version:"waste5-v1",
+  meta:"models/waste5-v1.json",
+  model:"models/waste5-v1.onnx",
+  modelB64:"models/waste5-v1.onnx.b64.txt",
+  wasm:"ort/ort-wasm-simd-threaded.wasm",
+  ortLocal:"ort/ort.wasm.bundle.min.mjs",
+  ortCdn:"https://cdn.jsdelivr.net/npm/onnxruntime-web@1.30.0/dist/ort.wasm.bundle.min.mjs",
+  ortVersion:"1.30.0",
+  input:224,resize:256
+};
+const AI={state:"checking",progress:0,err:null,session:null,ort:null,meta:null,times:ls.get("aiTimes",[]),cached:false,loading:null};
+const aiDB={
+  db:null,
+  async open(){if(this.db)return this.db;this.db=await new Promise((res,rej)=>{const r=indexedDB.open("adc-ai-cache",1);r.onupgradeneeded=()=>r.result.createObjectStore("files");r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});return this.db},
+  async get(k){const d=await this.open();return await new Promise((res,rej)=>{const t=d.transaction("files").objectStore("files").get(k);t.onsuccess=()=>res(t.result||null);t.onerror=()=>rej(t.error)})},
+  async put(k,v){const d=await this.open();return await new Promise((res,rej)=>{const tx=d.transaction("files","readwrite");tx.objectStore("files").put(v,k);tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error);tx.onabort=()=>rej(tx.error)})},
+  async keys(){const d=await this.open();return await new Promise((res,rej)=>{const t=d.transaction("files").objectStore("files").getAllKeys();t.onsuccess=()=>res(t.result||[]);t.onerror=()=>rej(t.error)})},
+  async clear(){const d=await this.open();return await new Promise((res,rej)=>{const tx=d.transaction("files","readwrite");tx.objectStore("files").clear();tx.oncomplete=()=>res();tx.onerror=()=>rej(tx.error)})}
+};
+const aiKey=f=>AI_CFG.version+"|"+f;
+const mb=n=>(n/1048576).toFixed(n>=10485760?0:1).replace(".",",")+" MB";
+function aiOn(){return !!(S.project&&S.project.aiMode!=="off")}
+function aiReady(){return AI.state==="ready"&&aiOn()}
+function aiRefreshUI(){if(S.route==="ambil")renderCategory();else if(S.route==="atur"){const el=$("#ai-panel");if(el){el.innerHTML=aiPanelHTML();showStorage()}}}
+async function aiInit(){
+  try{const r=await fetch(AI_CFG.meta,{cache:"no-cache"});if(r.ok)AI.meta=await r.json()}catch{}
+  try{
+    const m=await aiDB.get(aiKey(AI_CFG.model)),w=await aiDB.get(aiKey(AI_CFG.wasm));
+    AI.cached=!!(m&&w);
+    // remove files of older model versions
+    try{for(const k of await aiDB.keys()){if(!String(k).startsWith(AI_CFG.version+"|")){const d=await aiDB.open();d.transaction("files","readwrite").objectStore("files").delete(k)}}}catch{}
+  }catch(e){AI.cached=false}
+  AI.state=AI.cached?"cached":(AI.meta?"absent":"unavailable");
+  aiRefreshUI();
+  if(AI.cached&&aiOn())aiLoad();
+}
+async function fetchWithProgress(url,onBytes){
+  const r=await fetch(url);if(!r.ok)throw new Error("HTTP "+r.status+" untuk "+url);
+  if(!r.body||!r.body.getReader)return await r.arrayBuffer();
+  const reader=r.body.getReader();const chunks=[];let n=0;
+  for(;;){const {done,value}=await reader.read();if(done)break;chunks.push(value);n+=value.length;onBytes(value.length)}
+  const out=new Uint8Array(n);let o=0;for(const c of chunks){out.set(c,o);o+=c.length}return out.buffer;
+}
+async function aiDownload(){
+  if(AI.state==="downloading")return;
+  AI.state="downloading";AI.progress=0;AI.err=null;aiRefreshUI();
+  const total=(AI.meta?.files?.model_bytes||0)+(AI.meta?.files?.wasm_bytes||0)||1;let got=0;let last=0;
+  const tick=b=>{got+=b;AI.progress=Math.min(99,Math.round(got/total*100));const now=Date.now();if(now-last>150){last=now;aiRefreshUI()}};
+  try{
+    try{if(navigator.storage&&navigator.storage.persist)await navigator.storage.persist()}catch{}
+    if(!(await aiDB.get(aiKey(AI_CFG.wasm)).catch(()=>null)))await aiDB.put(aiKey(AI_CFG.wasm),await fetchWithProgress(AI_CFG.wasm,tick));else tick(AI.meta?.files?.wasm_bytes||0);
+    if(!(await aiDB.get(aiKey(AI_CFG.model)).catch(()=>null))){
+      let buf=null;
+      // offline package ships the raw .onnx; the hosted artifact ships the same bytes as base64 text
+      try{buf=await fetchWithProgress(AI_CFG.model,tick)}catch(e){buf=null}
+      if(!buf||new Uint8Array(buf.slice(0,1))[0]===60){
+        const scale=(AI.meta?.files?.model_bytes||1)/(AI.meta?.files?.model_b64_bytes||1);
+        const txt=new TextDecoder().decode(await fetchWithProgress(AI_CFG.modelB64,b=>tick(b*scale)));
+        const bin=atob(txt.trim());const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);buf=u.buffer;
+      }
+      await aiDB.put(aiKey(AI_CFG.model),buf);
+    }
+    AI.cached=true;AI.state="cached";aiRefreshUI();
+    await aiLoad();
+    if(AI.state==="ready"&&S.route==="ambil"&&S.draft&&S.draft.blob&&S.draft.ai.status==="idle"&&!selectedGroup())runAI();
+  }catch(e){AI.state="error";AI.err=e&&e.name==="QuotaExceededError"?"Ruang penyimpanan perangkat tidak cukup untuk menyimpan model.":"Model gagal diunduh: "+(e.message||e);aiRefreshUI()}
+}
+async function loadOrt(){
+  if(AI.ort)return AI.ort;
+  let mod=null,err=null;
+  for(const src of [new URL(AI_CFG.ortLocal,location.href).href,AI_CFG.ortCdn]){try{mod=await import(src);break}catch(e){err=e}}
+  if(!mod)throw new Error("Runtime ONNX tidak dapat dimuat ("+(err&&err.message||err)+")");
+  AI.ort=mod.default&&mod.default.InferenceSession?mod.default:mod;
+  return AI.ort;
+}
+async function aiLoad(){
+  if(AI.session)return;if(AI.loading)return AI.loading;
+  AI.loading=(async()=>{
+    AI.state="loading";aiRefreshUI();
+    try{
+      const ort=await loadOrt();
+      const wasm=await aiDB.get(aiKey(AI_CFG.wasm)),model=await aiDB.get(aiKey(AI_CFG.model));
+      if(!wasm||!model){AI.cached=false;AI.state="absent";aiRefreshUI();return}
+      ort.env.wasm.wasmBinary=wasm;ort.env.wasm.numThreads=1;ort.env.wasm.proxy=false;
+      try{ort.env.logLevel="error"}catch{}
+      AI.session=await ort.InferenceSession.create(new Uint8Array(model),{executionProviders:["wasm"],graphOptimizationLevel:"all"});
+      const n=AI_CFG.input;await AI.session.run({image:new ort.Tensor("float32",new Float32Array(3*n*n).fill(128),[1,3,n,n])});
+      AI.state="ready";AI.err=null;
+    }catch(e){
+      console.warn(e);AI.session=null;AI.state="error";
+      const m=String(e&&e.message||e);
+      AI.err=/WebAssembly|wasm|CompileError|unsafe-eval|Content Security/i.test(m)?"Browser atau tampilan ini tidak mengizinkan WebAssembly, sehingga model tidak bisa dijalankan di sini. Gunakan paket offline atau pilih kategori manual.":"Model tidak dapat dijalankan: "+m;
+    }finally{AI.loading=null;aiRefreshUI()}
+  })();
+  return AI.loading;
+}
+async function aiRemove(){try{AI.session&&AI.session.release&&await AI.session.release()}catch{}AI.session=null;await aiDB.clear().catch(()=>{});AI.cached=false;AI.state=AI.meta?"absent":"unavailable";aiRefreshUI();toast("Model AI dihapus dari perangkat ini.")}
+async function aiTensor(blob){
+  const n=AI_CFG.input,r=AI_CFG.resize;
+  const bmp=await loadBitmap(blob);
+  const k=r/Math.min(bmp.width,bmp.height);
+  const sw=n/k,sh=n/k,sx=(bmp.width-sw)/2,sy=(bmp.height-sh)/2;
+  // two-step downscale keeps detail closer to the bicubic resize used in training
+  let src=bmp;
+  if(Math.min(bmp.width,bmp.height)>r*2){const mid=document.createElement("canvas");const k2=(r*2)/Math.min(bmp.width,bmp.height);mid.width=Math.round(bmp.width*k2);mid.height=Math.round(bmp.height*k2);const mx=mid.getContext("2d");mx.imageSmoothingQuality="high";mx.drawImage(bmp,0,0,mid.width,mid.height);src=mid}
+  const sc=src.width/bmp.width;
+  const cv=document.createElement("canvas");cv.width=n;cv.height=n;const cx=cv.getContext("2d",{willReadFrequently:true});cx.imageSmoothingQuality="high";
+  cx.drawImage(src,sx*sc,sy*sc,sw*sc,sh*sc,0,0,n,n);
+  const d=cx.getImageData(0,0,n,n).data,a=new Float32Array(3*n*n),p=n*n;
+  for(let i=0;i<p;i++){a[i]=d[i*4];a[p+i]=d[i*4+1];a[2*p+i]=d[i*4+2]}
+  return a;
+}
+function embEncode(e){let mx=0;for(const v of e)mx=Math.max(mx,Math.abs(v));const s=mx||1;const q=new Int8Array(e.length);for(let i=0;i<e.length;i++)q[i]=Math.round(e[i]/s*127);let bin="";for(let i=0;i<q.length;i++)bin+=String.fromCharCode(q[i]&255);return {b64:btoa(bin),scale:s/127}}
+const embCache=new Map();
+function embDecode(b64,scale){const key=b64.slice(0,24)+b64.length+scale;if(embCache.has(key))return embCache.get(key);const bin=atob(b64);const v=new Float32Array(bin.length);let nn=0;for(let i=0;i<bin.length;i++){let c=bin.charCodeAt(i);if(c>127)c-=256;v[i]=c*scale;nn+=v[i]*v[i]}nn=Math.sqrt(nn)||1;for(let i=0;i<v.length;i++)v[i]/=nn;embCache.set(key,v);return v}
+function dot(a,b){let s=0;for(let i=0;i<a.length;i++)s+=a[i]*b[i];return s}
+/* Classify with the local model, then blend with nearest verified photos of this project (adapts to the project's own objects). */
+async function aiClassify(blob){
+  if(!AI.session)await aiLoad();
+  if(!AI.session)throw new Error(AI.err||"Model belum siap.");
+  const ort=AI.ort,n=AI_CFG.input;
+  const data=await aiTensor(blob);
+  const t0=performance.now();
+  const out=await AI.session.run({image:new ort.Tensor("float32",data,[1,3,n,n])});
+  const ms=Math.round(performance.now()-t0);
+  AI.times=[ms,...AI.times].slice(0,30);ls.set("aiTimes",AI.times);
+  const probs=Array.from(out.probs.data),emb=Float32Array.from(out.embedding.data);
+  const classes=(AI.meta&&AI.meta.classes)||["organik","kertas","plastik","logam","residu"];
+  const cats=(S.project.categories||[]).filter(c=>c.active!==false).map(c=>c.code);
+  const pm={};classes.forEach((c,i)=>{if(cats.includes(c))pm[c]=probs[i]});
+  let z=Object.values(pm).reduce((a,b)=>a+b,0)||1;for(const k in pm)pm[k]/=z;
+  // k-NN over verified photos with embeddings from the same model version
+  const refs=S.images.filter(i=>i.emb&&i.emb_v===AI_CFG.version&&cats.includes(i.category_confirmed)&&(S.project.aiLearn==="all"||i.verification_status==="verified"));
+  let w=0,pk={};
+  if(refs.length){
+    const sims=refs.map(r=>({c:r.category_confirmed,s:dot(emb,embDecode(r.emb,r.emb_scale))})).sort((a,b)=>b.s-a.s).slice(0,5);
+    for(const x of sims)pk[x.c]=(pk[x.c]||0)+Math.exp(10*x.s);
+    const zk=Object.values(pk).reduce((a,b)=>a+b,0);for(const k in pk)pk[k]/=zk;
+    w=Math.min(0.5,refs.length/50);
+  }
+  const final={};for(const c of cats)final[c]=(1-w)*(pm[c]||0)+w*(pk[c]||0);
+  const ranked=Object.entries(final).sort((a,b)=>b[1]-a[1]);
+  const [top,conf]=ranked[0]||[null,0];
+  const second=ranked[1]?ranked[1][1]:0;
+  const lowConf=!top||conf<0.5||(conf-second)<0.15;
+  const enc=embEncode(emb);
+  return {category:top,confidence:conf,alternatives:ranked.slice(1,3).map(([c,p])=>({category:c,confidence:p})),probs:final,lowConf,clear:!lowConf,
+    ms,knnRefs:refs.length,knnWeight:w,model:AI_CFG.version+" · lokal",emb:enc.b64,embScale:enc.scale,embVec:emb,
+    reason:refs.length?`Model lokal${w>0?` + ${refs.length} foto terverifikasi proyek ini`:""} · ${ms} ms`:`Model lokal · ${ms} ms di perangkat ini`};
+}
+function fieldAccuracy(){const v=S.images.filter(i=>i.category_predicted&&i.verification_status==="verified");const ok=v.filter(i=>i.category_predicted===i.category_confirmed).length;return {n:v.length,acc:v.length?ok/v.length:null}}
+function aiMedianMs(){const t=AI.times.slice().sort((a,b)=>a-b);return t.length?t[Math.floor(t.length/2)]:null}
+async function aiBenchmark(){
+  try{
+    if(!AI.session)await aiLoad();if(!AI.session)return;
+    const ort=AI.ort,n=AI_CFG.input,arr=new Float32Array(3*n*n);for(let i=0;i<arr.length;i++)arr[i]=(i*37)%255;
+    const ts=[];for(let i=0;i<8;i++){const t0=performance.now();await AI.session.run({image:new ort.Tensor("float32",arr,[1,3,n,n])});ts.push(performance.now()-t0)}
+    ts.sort((a,b)=>a-b);const med=Math.round(ts[4]);AI.bench=med;aiRefreshUI();toast(`Waktu inferensi di perangkat ini: median ${med} ms per foto.`);
+  }catch(e){toast("Uji kecepatan gagal: "+(e.message||e),true)}
+}
+function aiStatusLine(){
+  const m=AI.meta,f=m&&m.files;const size=f?mb((f.model_bytes||0)+(f.wasm_bytes||0)):"";
+  switch(AI.state){
+    case "ready":return {chip:"ok",text:"AI lokal siap"+(aiMedianMs()?` · ±${aiMedianMs()} ms/foto`:"")};
+    case "loading":return {chip:"acc",text:"Memuat model…"};
+    case "downloading":return {chip:"acc",text:`Mengunduh model ${AI.progress}%`};
+    case "cached":return {chip:"acc",text:"Model tersimpan, belum dimuat"};
+    case "absent":return {chip:"",text:`Model belum diunduh (${size})`};
+    case "error":return {chip:"warn",text:"AI lokal tidak berjalan"};
+    case "unavailable":return {chip:"",text:"Model tidak ditemukan di paket aplikasi"};
+    default:return {chip:"",text:"Memeriksa model…"};
+  }
+}
+function aiPanelHTML(){
+  const m=AI.meta,f=m&&m.files,st=aiStatusLine();
+  const ev=m&&m.evaluation;
+  return `<div class="card-h"><h2>AI lokal</h2><span class="chip ${st.chip}">${esc(st.text)}</span></div>
+  ${S.role==="admin"?`<label class="field">Rekomendasi kategori<select id="p-ai"><option value="local" ${S.project.aiMode!=="off"?"selected":""}>Aktif — model lokal di perangkat</option><option value="off" ${S.project.aiMode==="off"?"selected":""}>Mati — klasifikasi manual saja</option></select></label>
+  <label class="field">Belajar dari foto proyek<select id="p-learn"><option value="verified" ${S.project.aiLearn!=="all"?"selected":""}>Hanya foto terverifikasi pemeriksa</option><option value="all" ${S.project.aiLearn==="all"?"selected":""}>Semua foto yang sudah berlabel</option></select></label>`:""}
+  ${m?`<dl class="kv"><dt>Model</dt><dd>${esc(m.name)} · versi ${esc(m.version)}</dd><dt>Arsitektur</dt><dd>${esc(m.architecture)}</dd><dt>Ukuran unduhan</dt><dd>${mb(f.model_bytes)} model + ${mb(f.wasm_bytes)} runtime ONNX = ${mb(f.model_bytes+f.wasm_bytes)}</dd><dt>Runtime</dt><dd>ONNX Runtime Web ${esc(AI_CFG.ortVersion)} (WebAssembly, 1 thread)</dd>${ev?`<dt>Akurasi uji</dt><dd>${esc(ev.summary)}</dd>`:""}<dt>Lisensi</dt><dd>${esc(m.license)}</dd><dt>Akurasi di proyek ini</dt><dd>${(()=>{const f=fieldAccuracy();return f.n?`${Math.round(f.acc*100)}% cocok dengan label final pada ${f.n} foto terverifikasi`:"belum ada foto terverifikasi yang punya prediksi AI"})()}</dd><dt>Perangkat ini</dt><dd>${aiMedianMs()!=null?`median ${aiMedianMs()} ms dari ${AI.times.length} foto`:AI.bench?`median ${AI.bench} ms (uji kecepatan)`:"belum diukur"}</dd></dl>`:""}
+  ${AI.state==="downloading"?`<div class="progress"><span style="width:${AI.progress}%"></span></div>`:""}
+  ${AI.err?`<p class="note warn" style="font-size:.82rem">${esc(AI.err)}</p>`:""}
+  <div class="row">${AI.state==="absent"||AI.state==="error"&&!AI.cached?`<button class="btn primary" data-act="aiDownload">Unduh model ke perangkat</button>`:""}
+  ${AI.state==="cached"||AI.state==="error"&&AI.cached?`<button class="btn" data-act="aiLoad">Muat model</button>`:""}
+  ${AI.state==="ready"?`<button class="btn" data-act="aiBench">Uji kecepatan</button>`:""}
+  ${AI.cached?`<button class="btn danger" data-act="aiRemove">Hapus model dari perangkat</button>`:""}<span class="muted" id="ai-storage" style="font-size:.78rem"></span></div>
+  <p class="note" style="font-size:.8rem">Model berjalan di perangkat ini melalui WebAssembly dan tidak mengirim foto ke layanan AI mana pun. Model diunduh sekali dan disimpan di penyimpanan browser; unduhan ulang hanya terjadi saat versi model berubah atau penyimpanan browser dibersihkan. AI lokal memakai CPU, memori (±100–200 MB saat berjalan), dan ruang penyimpanan perangkat. Perangkat lama bisa lebih lambat. Setelah model tersimpan, saran AI tetap berjalan tanpa internet; menyimpan foto ke database tetap butuh koneksi.</p>
+  <p class="muted" style="font-size:.78rem">Prediksi hanya rekomendasi. Kategori final selalu dipilih atau dikonfirmasi pengguna, dan semua fungsi penamaan, penomoran, metadata, serta ekspor tetap berjalan tanpa AI.</p>`;
+}
+async function showStorage(){try{const el=$("#ai-storage");if(!el||!navigator.storage||!navigator.storage.estimate)return;const e=await navigator.storage.estimate();el.textContent=`Penyimpanan browser terpakai ${mb(e.usage||0)} dari kuota ±${mb(e.quota||0)}`}catch{}}
+
+
+async function loadBitmap(blob){
+  if(window.createImageBitmap){try{return await createImageBitmap(blob,{imageOrientation:"from-image"})}catch{}}
+  return await new Promise((res,rej)=>{const u=URL.createObjectURL(blob);const im=new Image();im.onload=()=>{res(im)};im.onerror=()=>rej(new Error("Gambar tidak dapat dibaca."));im.src=u});
+}
+function drawScaled(src,maxDim){const w0=src.width,h0=src.height;const k=maxDim&&Math.max(w0,h0)>maxDim?maxDim/Math.max(w0,h0):1;const cv=document.createElement("canvas");cv.width=Math.round(w0*k);cv.height=Math.round(h0*k);const cx=cv.getContext("2d");cx.fillStyle="#fff";cx.fillRect(0,0,cv.width,cv.height);cx.drawImage(src,0,0,cv.width,cv.height);return cv}
+function gray(src,w,h){const cv=document.createElement("canvas");cv.width=w;cv.height=h;const cx=cv.getContext("2d",{willReadFrequently:true});cx.drawImage(src,0,0,w,h);const d=cx.getImageData(0,0,w,h).data;const g=new Float32Array(w*h);for(let i=0;i<w*h;i++)g[i]=0.299*d[i*4]+0.587*d[i*4+1]+0.114*d[i*4+2];return g}
+function dhash(src){const g=gray(src,9,8);let bits="";for(let y=0;y<8;y++)for(let x=0;x<8;x++)bits+=g[y*9+x]>g[y*9+x+1]?"1":"0";let hex="";for(let i=0;i<64;i+=4)hex+=parseInt(bits.slice(i,i+4),2).toString(16);return hex}
+function blurScore(src){const w=320,h=Math.max(8,Math.round(src.height/src.width*320));const g=gray(src,w,h);let n=0,sum=0,sq=0;for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){const i=y*w+x;const l=4*g[i]-g[i-1]-g[i+1]-g[i-w]-g[i+w];sum+=l;sq+=l*l;n++}const m=sum/n;return sq/n-m*m}
+
+
+/* ---------- Supabase store ---------- */
+class Store{
+  constructor(c){this.c=c;this.urlCache=new Map();this.pend=new Map();this.subs=new Map();this.pt=null}
+  async all(q){const out=[];for(let from=0;;from+=1000){const {data,error}=await q().range(from,from+999);if(error)throw error;out.push(...data);if(data.length<1000)break}return out}
+  mapProject(r){return {...(r.data||{}),id:r.id,name:r.name,createdAt:r.created_at}}
+  mapGroup(r){return {id:r.id,code:r.id,category:r.category,lastRep:r.last_rep,createdAt:r.created_at,updatedAt:r.updated_at}}
+  mapImage(r){return {...(r.data||{}),id:r.id,group_id:r.group_id,object_code:r.group_id,filename:r.filename,repetition_number:r.repetition_number,verification_status:r.verification_status}}
+  async rows(kind,pid){
+    if(kind==="profiles")return await this.all(()=>this.c.from("profiles").select("user_id,username,full_name,role,photographer_code,active,created_at").order("created_at"));
+    if(kind==="projects")return (await this.all(()=>this.c.from("projects").select("id,name,data,created_at").order("created_at"))).map(r=>this.mapProject(r));
+    if(kind==="groups")return (await this.all(()=>this.c.from("object_groups").select("*").eq("project_id",pid).order("id"))).map(r=>this.mapGroup(r));
+    if(kind==="images")return (await this.all(()=>this.c.from("images").select("id,group_id,filename,repetition_number,verification_status,data").eq("project_id",pid).order("created_at"))).map(r=>this.mapImage(r));
+    if(kind==="counters"){const rs=await this.all(()=>this.c.from("counters").select("last_number").eq("project_id",pid));return [{id:"counter",last:rs[0]?rs[0].last_number:0}]}
+    return [];
+  }
+  sub(kind,pid,cb){
+    const key=kind+":"+(pid||"");let alive=true,cache=null,tmr=null,failed=false;
+    const idOf=r=>r.id||r.user_id;
+    const emit=()=>{if(alive&&cache)cb(Array.from(cache.values()))};
+    const reload=async()=>{try{const rows=await this.rows(kind,pid);if(!alive)return;cache=new Map(rows.map(r=>[idOf(r),r]));failed=false;emit()}catch(e){console.warn(e);if(alive&&!failed){failed=true;toast("Gagal memuat data: "+errMsg(e),"bad")}}};
+    const later=()=>{clearTimeout(tmr);tmr=setTimeout(reload,400)};
+    const table={profiles:"profiles",projects:"projects",groups:"object_groups",images:"images",counters:"counters"}[kind];
+    const opt={event:"*",schema:"public",table};if(pid)opt.filter="project_id=eq."+pid;
+    const ch=this.c.channel("adc-"+key+"-"+uid()).on("postgres_changes",opt,pl=>{
+      if(!cache)return later();
+      if(kind==="images"){if(pl.eventType==="DELETE"&&pl.old&&pl.old.id){cache.delete(pl.old.id);emit()}else if(pl.new&&pl.new.data){const r=this.mapImage(pl.new);cache.set(r.id,r);emit()}else later()}
+      else if(kind==="groups"&&pl.new&&pl.new.id&&pl.eventType!=="DELETE"){const r=this.mapGroup(pl.new);cache.set(r.id,r);emit()}
+      else later();
+    });
+    ch.subscribe(st=>{if(st==="SUBSCRIBED"&&cache)later()});
+    reload();
+    const iv=setInterval(reload,120000);
+    const vis=()=>{if(document.visibilityState==="visible")later()};document.addEventListener("visibilitychange",vis);window.addEventListener("online",later);
+    this.subs.set(key,{reload,patch:r=>{if(cache){cache.set(idOf(r),r);emit()}}});
+    return()=>{alive=false;clearInterval(iv);clearTimeout(tmr);document.removeEventListener("visibilitychange",vis);window.removeEventListener("online",later);try{this.c.removeChannel(ch)}catch{}this.subs.delete(key)};
+  }
+  refresh(kind,pid){this.subs.get(kind+":"+(pid||""))?.reload()}
+  patchImage(r){this.subs.get("images:"+r.project_id)?.patch(r)}
+  async rpc(fn,args){const {data,error}=await this.c.rpc(fn,args);if(error)throw error;return data}
+  async saveImage(c){
+    const path=c.pid+"/"+c.row.id+".jpg";
+    const up=await this.c.storage.from("photos").upload(path,c.blob,{contentType:"image/jpeg",upsert:false});
+    if(up.error)throw up.error;
+    try{
+      const row=await this.rpc("save_image",{p_project:c.pid,p_group:c.groupId,p_category:c.category,p_location:c.location,p_lighting:c.lighting,p_date:c.date,p_row:{...c.row,asset_id:path}});
+      this.refresh("groups",c.pid);this.refresh("counters",c.pid);
+      return row;
+    }catch(e){await this.c.storage.from("photos").remove([path]).catch(()=>{});throw e}
+  }
+  async setStatus(pid,ids,status){for(let i=0;i<ids.length;i+=200)await this.rpc("set_status",{p_project:pid,p_ids:ids.slice(i,i+200),p_status:status});this.refresh("images",pid)}
+  async relabelGroup(pid,gid,cat){await this.rpc("relabel_group",{p_project:pid,p_group:gid,p_category:cat});this.refresh("images",pid);this.refresh("groups",pid)}
+  async deleteImage(pid,i){const asset=await this.rpc("delete_image",{p_project:pid,p_id:i.id});if(asset)await this.rmBlob(asset);this.refresh("images",pid)}
+  async createProject(cfg){const id=await this.rpc("create_project",{p_name:cfg.name,p_data:cfg});this.refresh("projects");return id}
+  async saveProject(pid,cfg){const {id,createdAt,...data}=cfg;const {error}=await this.c.from("projects").update({name:data.name,data,updated_at:new Date().toISOString()}).eq("id",pid);if(error)throw error}
+  async deleteProject(pid){
+    const b=this.c.storage.from("photos");
+    for(;;){const {data,error}=await b.list(pid,{limit:100});if(error)throw error;if(!data||!data.length)break;const {error:e2}=await b.remove(data.map(f=>pid+"/"+f.name));if(e2)throw e2;if(data.length<100)break}
+    const {error}=await this.c.from("projects").delete().eq("id",pid);if(error)throw error;this.refresh("projects");
+  }
+  async createUser(u){const id=await this.rpc("admin_create_user",{p_username:u.username,p_password:u.password,p_full_name:u.full_name,p_role:u.role,p_code:u.code});this.refresh("profiles");return id}
+  async updateUser(id,u){await this.rpc("admin_update_user",{p_user:id,p_full_name:u.full_name,p_role:u.role,p_code:u.code,p_active:u.active});this.refresh("profiles")}
+  async setPassword(id,pw){await this.rpc("admin_set_password",{p_user:id,p_password:pw})}
+  async deleteUser(id){await this.rpc("admin_delete_user",{p_user:id});this.refresh("profiles")}
+  url(id){
+    const c=this.urlCache.get(id);if(c&&c.exp>Date.now())return Promise.resolve(c.url);
+    return new Promise((res,rej)=>{const w=this.pend.get(id)||[];w.push({res,rej});this.pend.set(id,w);clearTimeout(this.pt);this.pt=setTimeout(()=>this.flushUrls(),30)});
+  }
+  async flushUrls(){
+    const waiting=new Map(this.pend);this.pend.clear();const ids=[...waiting.keys()];
+    for(let i=0;i<ids.length;i+=100){
+      const chunk=ids.slice(i,i+100);let data=null,error=null;
+      try{({data,error}=await this.c.storage.from("photos").createSignedUrls(chunk,3600))}catch(e){error=e}
+      for(const p of chunk){const d=data&&data.find(x=>x.path===p);const ws=waiting.get(p)||[];if(d&&d.signedUrl){this.urlCache.set(p,{url:d.signedUrl,exp:Date.now()+3300e3});ws.forEach(x=>x.res(d.signedUrl))}else ws.forEach(x=>x.rej(error||new Error("Foto tidak ditemukan")))}
+    }
+  }
+  async blob(id){const {data,error}=await this.c.storage.from("photos").download(id);if(error)throw error;return data}
+  async rmBlob(id){if(id){try{await this.c.storage.from("photos").remove([id])}catch{}}}
+}
+
+/* ---------- state ---------- */
+const S={
+  sb:null,store:null,user:null,me:null,role:null,downloads:null,
+  profiles:[],projects:[],pid:null,project:null,groups:[],images:[],counter:0,
+  unsubs:[],baseUnsubs:[],route:"beranda",sub:null,
+  session:null,draft:null,cam:{stream:null,facing:"environment",devices:[],open:false,err:null,state:"idle"},
+  recent:[],lastSaved:null,gq:"",
+  gf:{q:"",cat:"",loc:"",ph:"",date:"",code:"",status:""},galView:ls.get("galView","grid"),
+  modal:null,busy:false,exporting:false,
+  exportOpts:ls.get("exportOpts2",{scope:"all",split:true,layout:"flat",train:70,val:15,test:15,seed:"42"}),
+  authView:"checking",authMsg:null,authBusy:false,showPw:false,newCred:null,editUser:null,pwUser:null,delUser:null
+};
+const P=()=>S.pid;
+function defaultProject(name){
+  return {name:name||"Dataset Sampah Kampus",description:"Pengumpulan citra sampah per kategori untuk pelatihan dan pengujian model klasifikasi.",
+    categories:DEFAULT_CATS.map(c=>({...c})),lightings:DEFAULT_LIGHTS.map(l=>({...l})),
+    targetPerCategory:200,jpegQuality:0.9,maxDim:1600,aiMode:"local",aiLearn:"verified",startDate:todayIso(),status:"aktif"};
+}
+
+/* ---------- boot & auth ---------- */
+function loadScript(src){return new Promise((res,rej)=>{const el=document.createElement("script");el.src=src;el.onload=()=>res();el.onerror=()=>{el.remove();rej(new Error("gagal: "+src))};document.head.append(el)})}
+async function boot(){
+  if(IS_ARTIFACT)claude.use("downloads").then(d=>{S.downloads=d}).catch(()=>{});
+  else if("serviceWorker" in navigator&&(location.protocol==="https:"||/^(localhost|127\.0\.0\.1)$/.test(location.hostname)))navigator.serviceWorker.register("sw.js").catch(()=>{});
+  aiInit();
+  if(!CFG.supabaseUrl||!CFG.supabaseKey){showAuthShell();$("#authroot").innerHTML=authLayout(`<h1>Belum terhubung</h1><p class="muted">Isi <span class="mono">supabaseUrl</span> dan <span class="mono">supabaseKey</span> di berkas <span class="mono">config.js</span>, lalu muat ulang halaman.</p>`);return}
+  if(!window.supabase){try{await loadScript("vendor/supabase.js")}catch{}}
+  if(!window.supabase){try{await loadScript("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js")}catch{}}
+  if(!window.supabase){showAuthShell();$("#authroot").innerHTML=authLayout(`<h1>Tidak dapat terhubung</h1><p class="muted">Pustaka database gagal dimuat. Periksa koneksi internet lalu muat ulang halaman.</p>`);return}
+  S.sb=window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseKey,{auth:{persistSession:true,autoRefreshToken:true}});
+  S.sb.auth.onAuthStateChange(ev=>{if(ev==="SIGNED_OUT"&&S.user)resetSession()});
+  window.addEventListener("hashchange",onRoute);
+  let session=null;try{({data:{session}}=await S.sb.auth.getSession())}catch{}
+  if(session&&session.user)await startSession(session.user);else showAuth();
+}
+async function showAuth(msg){
+  S.authView="checking";S.authMsg=msg||null;renderAuth();
+  let needs=false;try{const {data,error}=await S.sb.rpc("needs_setup");if(error)throw error;needs=!!data}catch(e){console.warn(e)}
+  S.authView=needs?"setup":"login";renderAuth();
+}
+function showAuthShell(){document.body.classList.add("noauth");$("#shell").hidden=true;$("#tabbar").hidden=true;$("#authroot").hidden=false}
+function authLayout(inner){
+  return `<div class="auth"><section class="art"><div class="dots"></div><div class="brand"><div class="logo">${ICON.logo}</div><div><b>Dataset Collector</b><span style="color:inherit;opacity:.8">Pengumpulan citra berlabel</span></div></div>
+  <div class="stack" style="gap:14px"><h1>Foto, label, dan nama berkas rapi dalam satu alur.</h1><p class="why">Setiap foto langsung diberi nama sesuai standar dataset, dikelompokkan per objek fisik, dan siap diekspor untuk pelatihan model.</p></div>
+  <div class="sample"><b>plastik</b>_kantin_in_20261029_<b>FA01</b>_0007_<b>2</b>.jpg<br><span style="opacity:.75">kelas · lokasi · cahaya · tanggal · fotografer · id objek · ulangan</span></div></section>
+  <section class="form"><div class="box">${inner}</div></section></div>`;
+}
+function pwField(id,label,auto,extra=""){return `<label class="field">${label}<div class="pw"><input type="${S.showPw?"text":"password"}" id="${id}" autocomplete="${auto}" required minlength="8" ${extra}><button type="button" data-act="togglePw" aria-label="${S.showPw?"Sembunyikan":"Tampilkan"} kata sandi">${S.showPw?ICON.eyeoff:ICON.eye}</button></div></label>`}
+function renderAuth(){
+  showAuthShell();
+  const v=S.authView,busy=S.authBusy,m=S.authMsg;
+  const msg=m?`<p class="note ${m.bad?"bad":"ok"}">${esc(m.text)}</p>`:"";
+  let inner="";
+  if(v==="checking")inner=`<div class="row muted"><span class="spin"></span> Menghubungkan ke database…</div>`;
+  else if(v==="login")inner=`<div class="stack" style="gap:6px"><h1>Masuk</h1><p class="muted">Gunakan username dan kata sandi dari admin proyek.</p></div>${msg}
+    <form id="f-login" autocomplete="on"><label class="field">Username<input type="text" id="au-user" autocomplete="username" autocapitalize="none" spellcheck="false" required value="${esc(S.authUser||"")}"></label>
+    ${pwField("au-pass","Kata sandi","current-password")}
+    <button class="btn primary lg block" type="submit" ${busy?"disabled":""}>${busy?'<span class="spin"></span> Masuk…':"Masuk"}</button></form>
+    <p class="muted small">Belum punya akun atau lupa kata sandi? Hubungi admin proyek. Akun hanya dibuat oleh admin.</p>`;
+  else if(v==="setup")inner=`<div class="stack" style="gap:6px"><span class="chip acc" style="align-self:flex-start">Penyiapan pertama</span><h1>Buat akun admin</h1><p class="muted">Database masih kosong. Akun pertama otomatis menjadi admin, lalu admin menambahkan pengguna lain dari menu Pengaturan.</p></div>${msg}
+    <form id="f-setup"><label class="field">Nama lengkap<input type="text" id="su-name" autocomplete="name" required></label>
+    <div class="grid2" style="gap:10px"><label class="field">Username<input type="text" id="su-user" autocomplete="username" autocapitalize="none" spellcheck="false" required placeholder="mis. admin"></label>
+    <label class="field">Kode fotografer<input type="text" id="su-code" value="FA01" required style="text-transform:uppercase;font-family:var(--f-mono)"></label></div>
+    ${pwField("su-pass","Kata sandi (minimal 8 karakter)","new-password")}${pwField("su-pass2","Ulangi kata sandi","new-password")}
+    <button class="btn primary lg block" type="submit" ${busy?"disabled":""}>${busy?'<span class="spin"></span> Membuat akun…':"Buat akun admin"}</button></form>`;
+  $("#authroot").innerHTML=authLayout(inner);
+  const f=$("#au-user")||$("#su-name");if(f&&!busy)setTimeout(()=>{try{f.focus({preventScroll:true})}catch{}},30);
+}
+function authErr(e){const m=String(e&&e.message||e);if(/Invalid login credentials/i.test(m))return "Username atau kata sandi salah.";if(/rate limit|too many/i.test(m))return "Terlalu banyak percobaan. Tunggu beberapa menit lalu coba lagi.";return errMsg(e)}
+async function login(username,password){
+  const {data,error}=await S.sb.auth.signInWithPassword({email:username+"@"+LOGIN_DOMAIN,password});
+  if(error)throw error;return data.user;
+}
+document.addEventListener("submit",async e=>{
+  const id=e.target.id;
+  if(id==="f-login"||id==="f-setup"){
+    e.preventDefault();if(S.authBusy)return;
+    S.authMsg=null;
+    try{
+      if(id==="f-login"){
+        const u=normUser($("#au-user").value),pw=$("#au-pass").value;S.authUser=u;
+        if(!u)throw new Error("Isi username.");
+        S.authBusy=true;renderAuth();
+        const user=await login(u,pw);S.authBusy=false;await startSession(user);return;
+      }
+      const name=$("#su-name").value.trim(),u=normUser($("#su-user").value),code=codeToken($("#su-code").value),pw=$("#su-pass").value,pw2=$("#su-pass2").value;
+      if(!USER_RE.test(u))throw new Error("Username 3–30 karakter: huruf kecil, angka, titik, garis bawah, atau strip.");
+      if(!/^[A-Z0-9]{2,10}$/.test(code))throw new Error("Kode fotografer 2–10 huruf besar atau angka, misalnya FA01.");
+      if(pw.length<8)throw new Error("Kata sandi minimal 8 karakter.");
+      if(pw!==pw2)throw new Error("Kedua kata sandi tidak sama.");
+      S.authBusy=true;renderAuth();
+      const {error}=await S.sb.rpc("setup_admin",{p_username:u,p_password:pw,p_full_name:name,p_code:code});if(error)throw error;
+      const user=await login(u,pw);S.authBusy=false;S.firstRun=true;await startSession(user);toast("Akun admin dibuat. Selamat datang!","ok");return;
+    }catch(err){S.authBusy=false;S.authMsg={bad:true,text:authErr(err)};renderAuth();return}
+  }
+  if(id==="f-adduser"){e.preventDefault();addUser();}
+  if(id==="f-mypw"){e.preventDefault();changeMyPassword();}
+  if(id==="f-newproj"){e.preventDefault();const n=($("#np-name")?.value||"").trim();createProject(defaultProject(n||undefined));}
+});
+async function startSession(user){
+  S.user=user;S.store=new Store(S.sb);
+  let prof=null;
+  try{const {data,error}=await S.sb.from("profiles").select("user_id,username,full_name,role,photographer_code,active,created_at").eq("user_id",user.id);if(error)throw error;prof=(data||[])[0]||null}catch(e){console.warn(e)}
+  if(!prof||!prof.active){S.user=null;S.store=null;try{await S.sb.auth.signOut()}catch{};return showAuth({bad:true,text:"Akun ini tidak aktif atau sudah dihapus. Hubungi admin."})}
+  S.me=prof;S.role=prof.role;S.authView=null;
+  document.body.classList.remove("noauth");$("#authroot").hidden=true;$("#authroot").innerHTML="";$("#shell").hidden=false;$("#tabbar").hidden=false;
+  S.baseUnsubs.push(S.store.sub("profiles",null,onProfiles));
+  S.baseUnsubs.push(S.store.sub("projects",null,onProjects));
+  renderNav();onRoute();
+}
+function onProfiles(rows){
+  S.profiles=rows.sort((a,b)=>(a.created_at||"")<(b.created_at||"")?-1:1);
+  const me=rows.find(r=>r.user_id===S.user.id);
+  if(!me||!me.active){toast("Akun Anda dinonaktifkan oleh admin.","bad");signOut();return}
+  const changed=me.role!==S.role;S.me=me;S.role=me.role;
+  renderNav();
+  if(changed){if(!can("admin")&&["proyek","pengguna"].includes(S.sub))S.sub=null;render()}
+  else if(S.route==="atur"||S.route==="beranda"||S.route==="galeri")renderSoft();
+}
+function onProjects(rows){
+  S.projects=rows.sort((a,b)=>(a.createdAt||"")<(b.createdAt||"")?-1:1);
+  const want=ls.get("pid",null);
+  if(!S.pid||!S.projects.find(p=>p.id===S.pid)){
+    const pick=S.projects.find(p=>p.id===want)||S.projects[0];
+    if(pick)selectProject(pick.id);else{clearProject();render()}
+  }else{S.project=S.projects.find(p=>p.id===S.pid);renderSoft()}
+}
+function clearProject(){S.unsubs.forEach(u=>{try{u()}catch{}});S.unsubs=[];S.pid=null;S.project=null;S.groups=[];S.images=[];S.counter=0}
+function selectProject(pid){
+  clearProject();
+  S.pid=pid;S.project=S.projects.find(p=>p.id===pid)||null;ls.set("pid",pid);
+  initSession();
+  S.unsubs.push(S.store.sub("groups",pid,rows=>{S.groups=rows;renderSoft()}));
+  S.unsubs.push(S.store.sub("images",pid,rows=>{S.images=rows;renderSoft()}));
+  S.unsubs.push(S.store.sub("counters",pid,rows=>{S.counter=(rows[0]&&rows[0].last)||0;renderSoft()}));
+  if(AI.cached&&aiOn()&&!AI.session&&AI.state!=="error")aiLoad();
+  render();
+}
+function lightsOf(){return (S.project&&S.project.lightings&&S.project.lightings.length)?S.project.lightings:DEFAULT_LIGHTS}
+function initSession(){
+  const l=lightsOf();const savedLight=ls.get("light:"+S.pid,null);
+  S.session={location:ls.get("loc:"+S.pid,""),lighting:l.some(x=>x.code===savedLight)?savedLight:l[0].code,dateIso:todayIso()};
+  S.draft=newDraft();S.lastSaved=null;S.recent=[];
+}
+function newDraft(group){return {blob:null,url:null,w:0,h:0,size:0,blur:null,hash:null,flags:[],origName:null,ai:{status:"idle"},category:"",groupChoice:group||null,note:"",similar:null}}
+async function signOut(){try{await S.sb.auth.signOut()}catch{}if(S.user)resetSession()}
+function resetSession(){
+  stopCamera(true);closeModal();
+  clearProject();S.baseUnsubs.forEach(u=>{try{u()}catch{}});S.baseUnsubs=[];
+  Object.assign(S,{user:null,me:null,role:null,store:null,profiles:[],projects:[],recent:[],lastSaved:null,newCred:null,sub:null,authMsg:null,authBusy:false});
+  location.hash="";showAuth();
+}
+
+/* ---------- routing & shell ---------- */
+const ROUTES=[
+  {id:"beranda",label:"Dashboard",icon:"home"},
+  {id:"galeri",label:"Galeri",icon:"grid"},
+  {id:"ambil",label:"Ambil foto",short:"Kamera",icon:"cam"},
+  {id:"ekspor",label:"Ekspor",icon:"box"},
+  {id:"atur",label:"Pengaturan",short:"Atur",icon:"gear"}
+];
+function onRoute(){
+  if(!S.user)return;
+  const h=(location.hash||"").replace("#","");
+  S.route=ROUTES.find(r=>r.id===h)?h:"beranda";
+  if(S.route!=="ambil")stopCamera(true);
+  closeModal();renderNav();render();window.scrollTo(0,0);
+}
+function go(r){if(location.hash==="#"+r)onRoute();else location.hash=r}
+function renderNav(){
+  if(!S.me)return;
+  const order=["ambil","beranda","galeri","ekspor","atur"];
+  $("#nav").innerHTML=order.map(id=>{const r=ROUTES.find(x=>x.id===id);return `<a href="#${r.id}" class="${id==="ambil"?"cta":""}" ${S.route===r.id?'aria-current="page"':""}>${ICON[r.icon]}<span>${esc(r.label)}</span></a>`}).join("");
+  $("#tabbar").innerHTML=ROUTES.map(r=>r.id==="ambil"?`<a href="#ambil" class="cam-tab" ${S.route==="ambil"?'aria-current="page"':""} aria-label="Ambil foto"><span class="fab">${ICON.cam}</span></a>`:`<a href="#${r.id}" ${S.route===r.id?'aria-current="page"':""}>${ICON[r.icon]}<span>${esc(r.short||r.label)}</span></a>`).join("");
+  const me=S.me;
+  const meHtml=`<span class="avatar">${esc(initials(me))}</span><span class="who"><b>${esc(me.full_name||me.username)}</b><span>@${esc(me.username)} · ${esc(ROLE_LABEL[S.role])} · ${esc(me.photographer_code)}</span></span>`;
+  $("#sidefoot").innerHTML=`<div class="row" style="flex-wrap:nowrap;gap:6px"><a class="me" href="#atur" data-act="openAccount" style="flex:1;min-width:0">${meHtml}</a><button class="btn ghost iconbtn" data-act="signOut" aria-label="Keluar" title="Keluar">${ICON.logout}</button></div>`;
+  $("#topme").innerHTML=`<a href="#atur" data-act="openAccount" class="avatar" aria-label="Akun ${esc(me.username)}" style="text-decoration:none">${esc(initials(me))}</a>`;
+}
+let softTimer=null;
+function renderSoft(){clearTimeout(softTimer);softTimer=setTimeout(()=>{if(!S.user)return;if(S.route==="ambil")renderCaptureParts();else if(S.route==="atur"&&document.activeElement&&document.activeElement.closest&&document.activeElement.closest("#app")&&/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))return;else render()},80)}
+function render(){
+  const app=$("#app");if(!S.user)return;
+  if(!S.project&&S.route!=="atur"){app.innerHTML=pageHead("Mulai")+noProject();return}
+  const fn={beranda:viewDashboard,ambil:viewCapture,galeri:viewGallery,ekspor:viewExport,atur:viewSettings}[S.route];
+  app.innerHTML=fn();
+  afterRender();
+}
+function afterRender(){
+  if(S.route==="ambil")renderCaptureParts();
+  if(S.route==="galeri")hydrate();
+  if(S.route==="atur")showStorage();
+}
+function pageHead(title,sub){
+  const pick=S.projects.length>1?`<label class="projpick"><span class="eyebrow">Proyek</span><select id="projSel" aria-label="Pilih proyek">${S.projects.map(p=>`<option value="${esc(p.id)}" ${p.id===S.pid?"selected":""}>${esc(p.name)}</option>`).join("")}</select></label>`:"";
+  return `<div class="pagehead"><div class="t"><span class="eyebrow">${esc(S.project?S.project.name:"Dataset Collector")}</span><h1>${esc(title)}</h1>${sub?`<p>${sub}</p>`:""}</div>${pick}</div>`;
+}
+function noProject(){
+  if(can("admin"))return `<section class="card" style="max-width:620px"><div class="card-h"><div class="lead"><span class="step">1</span><h2>Buat proyek dataset pertama</h2></div></div>
+    <p class="muted">Proyek menyimpan kategori, kondisi cahaya, dan target foto. Konfigurasi awal mengikuti standar PRD: organik, kertas, plastik, logam, residu, dengan cahaya in/out. Semua bisa diubah nanti di Pengaturan.</p>
+    <form id="f-newproj" class="stack"><label class="field">Nama proyek<input type="text" id="np-name" value="Dataset Sampah Kampus" required></label><button class="btn primary lg" type="submit" style="align-self:flex-start">${ICON.plus} Buat proyek</button></form></section>
+    <section class="card" style="max-width:620px"><div class="card-h"><div class="lead"><span class="step">2</span><h2>Tambahkan anggota tim</h2></div></div><p class="muted">Setelah proyek dibuat, buka <b>Pengaturan → Pengguna</b> untuk membuat akun pengumpul dan pemeriksa.</p></section>`;
+  return `<div class="empty-state"><div class="ic">${ICON.folder}</div><h2>Belum ada proyek</h2><p style="max-width:44ch">Admin belum membuat proyek dataset. Hubungi admin, lalu muat ulang halaman ini.</p></div>`;
+}
+document.addEventListener("change",e=>{if(e.target.id==="projSel")selectProject(e.target.value)});
+
+/* ---------- stats ---------- */
+function stats(){
+  const cfg=S.project,imgs=S.images;
+  const cats=(cfg.categories||[]).filter(c=>c.active!==false);
+  const used=new Set(imgs.map(i=>i.group_id));
+  const groups=S.groups.filter(g=>used.has(g.id));
+  const perCat=cats.map(c=>({code:c.code,name:c.name,photos:imgs.filter(i=>i.category_confirmed===c.code).length,objects:groups.filter(g=>g.category===c.code).length}));
+  const count=key=>{const m=new Map();for(const x of imgs){const k=x[key]||"–";m.set(k,(m.get(k)||0)+1)}return [...m.entries()].sort((a,b)=>b[1]-a[1])};
+  return {total:imgs.length,objects:groups.length,pending:imgs.filter(i=>i.verification_status!=="verified").length,verified:imgs.filter(i=>i.verification_status==="verified").length,perCat,perLoc:count("location"),perPh:count("photographer_code")};
+}
+function fieldAccuracy(){const v=S.images.filter(i=>i.category_predicted&&i.verification_status==="verified");const ok=v.filter(i=>i.category_predicted===i.category_confirmed).length;return {n:v.length,acc:v.length?ok/v.length:null}}
+function qualityIssues(){
+  const out=[];
+  const req=["location","lighting","photographer_code","capture_date","filename","asset_id","repetition_number","group_id","category_confirmed"];
+  const incomplete=S.images.filter(i=>req.some(k=>i[k]==null||i[k]===""));
+  if(incomplete.length)out.push({sev:"bad",text:`${incomplete.length} foto memiliki metadata wajib yang kosong.`});
+  const badName=S.images.filter(i=>!FILENAME_RE.test(i.filename||""));
+  if(badName.length)out.push({sev:"bad",text:`${badName.length} nama berkas tidak sesuai pola standar.`});
+  const gmap=new Map(S.groups.map(g=>[g.id,g]));
+  const incons=S.images.filter(i=>{const g=gmap.get(i.group_id);return g&&g.category!==i.category_confirmed});
+  if(incons.length)out.push({sev:"bad",text:`${incons.length} foto berkategori berbeda dengan objeknya.`});
+  const small=S.images.filter(i=>(i.quality_flags||[]).includes("kecil"));
+  if(small.length)out.push({sev:"warn",text:`${small.length} foto berukuran kecil (sisi terpendek < 224 px).`});
+  const blur=S.images.filter(i=>(i.quality_flags||[]).includes("buram"));
+  if(blur.length)out.push({sev:"warn",text:`${blur.length} foto terdeteksi mungkin buram.`});
+  let near=0;const arr=S.images.filter(i=>i.hash);
+  if(arr.length<=1500){for(let a=0;a<arr.length;a++)for(let b=a+1;b<arr.length;b++){if(arr[a].group_id!==arr[b].group_id&&hamming(arr[a].hash,arr[b].hash)<=3)near++}}
+  if(near)out.push({sev:"warn",text:`${near} pasang foto sangat mirip tetapi tercatat sebagai objek berbeda. Periksa apakah objek yang sama punya dua ID.`});
+  const st=stats();const withP=st.perCat.filter(c=>c.photos>0);
+  if(withP.length>=2){const mx=Math.max(...st.perCat.map(c=>c.photos)),mn=Math.min(...st.perCat.map(c=>c.photos));if(mn===0||mx/mn>1.5)out.push({sev:"warn",text:`Jumlah foto antar kategori belum seimbang (terbanyak ${mx}, tersedikit ${mn}).`})}
+  {const f=fieldAccuracy();if(f.n>=10)out.push({sev:f.acc<0.7?"warn":"info",text:`Rekomendasi AI cocok dengan label final pada ${Math.round(f.acc*100)}% dari ${f.n} foto terverifikasi.`})}
+  if(st.pending)out.push({sev:"info",text:`${st.pending} foto belum diverifikasi pemeriksa.`,filter:{status:"pending"}});
+  return out;
+}
+function nameOfCode(code){const p=S.profiles.find(x=>x.photographer_code===code);return p?(p.full_name||p.username):""}
+
+/* ---------- dashboard ---------- */
+function viewDashboard(){
+  const st=stats(),cfg=S.project,target=+cfg.targetPerCategory||0,totTarget=target*st.perCat.length;
+  const maxScale=Math.max(target,...st.perCat.map(c=>c.photos),1),issues=qualityIssues();
+  const pct=totTarget?Math.min(100,Math.round(st.perCat.reduce((s,c)=>s+Math.min(c.photos,target),0)/totTarget*100)):0;
+  const avg=st.objects?st.total/st.objects:0;
+  return pageHead("Dashboard",esc(cfg.description||""))+`
+  <div class="hero"><div class="stack" style="gap:4px"><h2>Progres pengumpulan ${pct}%</h2><p>Target ${fmtInt(target)} foto per kategori · ${fmtInt(totTarget)} foto total</p><div class="progress"><span style="width:${pct}%"></span></div></div>
+  <a class="btn lg" href="#ambil">${ICON.cam} Mulai pengambilan</a></div>
+  <div class="kpis">
+    <div class="kpi"><b class="num">${fmtInt(st.total)}</b><span>Total foto</span></div>
+    <div class="kpi"><b class="num">${fmtInt(st.objects)}</b><span>Objek fisik unik</span></div>
+    <div class="kpi"><b class="num">${avg?(avg>=10?Math.round(avg):avg.toFixed(1).replace(".",",")):"0"}</b><span>Rata-rata foto per objek</span></div>
+    <div class="kpi"><b class="num">${fmtInt(st.pending)}</b><span>Belum diverifikasi</span></div>
+  </div>
+  <div class="grid2">
+    <section class="card"><div class="card-h"><h2>Foto dan objek per kategori</h2><span class="muted small">garis = target ${fmtInt(target)}</span></div>
+      <div class="bars">${st.perCat.map(c=>`<div class="bar-row ${clsOf(c.code)}" style="${clsStyle(c.code)}"><div class="lbl"><i></i>${esc(c.name)}</div>
+        <div class="track"><div class="fill" style="width:${c.photos/maxScale*100}%"></div>${target?`<div class="tick" style="left:calc(${target/maxScale*100}% - 1px)"></div>`:""}</div>
+        <div class="val"><b>${fmtInt(c.photos)}</b> foto · ${fmtInt(c.objects)} objek</div></div>`).join("")||'<p class="muted">Belum ada kategori aktif.</p>'}</div></section>
+    <section class="card"><div class="card-h"><h2>Validasi kualitas</h2>${issues.filter(i=>i.sev!=="info").length?"":'<span class="chip ok">Tidak ada masalah</span>'}</div>
+      <ul class="issues">${issues.length?issues.map(i=>`<li><span class="sev ${i.sev}"></span><span>${esc(i.text)}${i.filter?` <a href="#galeri" data-act="galFilter" data-f='${esc(JSON.stringify(i.filter))}'>Lihat</a>`:""}</span></li>`).join(""):`<li><span class="sev ok"></span><span>Semua foto punya metadata wajib dan nama berkas yang valid.</span></li>`}</ul></section>
+  </div>
+  <div class="grid2">
+    <section class="card"><h2>Foto per lokasi</h2>${miniTable(st.perLoc,"Lokasi",st.total)}</section>
+    <section class="card"><h2>Foto per fotografer</h2>${miniTable(st.perPh.map(([k,n])=>[k+(nameOfCode(k)?" · "+nameOfCode(k):""),n]),"Fotografer",st.total)}</section>
+  </div>`;
+}
+function miniTable(rows,h,total){if(!rows.length)return '<p class="muted small">Belum ada data.</p>';return `<div class="tscroll"><table class="t"><thead><tr><th>${h}</th><th style="text-align:right">Foto</th><th style="text-align:right">Porsi</th></tr></thead><tbody>${rows.map(([k,n])=>`<tr><td>${esc(k)}</td><td style="text-align:right">${fmtInt(n)}</td><td style="text-align:right">${total?Math.round(n/total*100):0}%</td></tr>`).join("")}</tbody></table></div>`}
+
+/* ---------- capture ---------- */
+function viewCapture(){
+  const s=S.session;
+  const locs=[...new Set(S.images.map(i=>i.location).filter(Boolean))].sort();
+  return pageHead("Ambil foto","Isi langkah 1–4. Nama berkas disusun otomatis di bagian paling bawah.")+`
+  <div class="capture">
+    <div class="col">
+      <section class="card" id="cap-session">
+        <div class="card-h"><div class="lead"><span class="step" id="st1">1</span><h2>Sesi pengambilan</h2></div></div>
+        <label class="field">Lokasi<input type="text" id="s-loc" list="loc-list" autocomplete="off" autocapitalize="none" placeholder="Ketik lokasi, mis. kantin" value="${esc(s.location)}"><span class="hint" id="loc-hint">${locHint()}</span></label>
+        <datalist id="loc-list">${locs.map(l=>`<option value="${esc(l)}"></option>`).join("")}</datalist>
+        <div class="field"><span>Kondisi cahaya</span><div class="seg" role="group" aria-label="Kondisi cahaya" id="light-seg">${lightsOf().map(l=>`<button type="button" data-act="light" data-v="${esc(l.code)}" aria-pressed="${s.lighting===l.code}">${esc(l.label)}<small>${esc(l.code)}</small></button>`).join("")}</div></div>
+        <div class="grid2" style="gap:10px">
+          <label class="field">Tanggal<input type="date" id="s-date" value="${esc(s.dateIso)}"></label>
+          <div class="field"><span>Fotografer</span><div class="whoami"><span class="code">${esc(S.me.photographer_code)}</span><span class="small" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(S.me.full_name||S.me.username)}</span></div></div>
+        </div>
+      </section>
+      <section class="card" id="cap-photo"></section>
+    </div>
+    <div class="col">
+      <section class="card" id="cap-group"></section>
+      <section class="card" id="cap-cat"></section>
+      <section class="card"><label class="field">Catatan (opsional)<textarea id="d-note" placeholder="mis. botol penyok, ada label, latar meja kayu">${esc(S.draft.note)}</textarea></label></section>
+    </div>
+  </div>
+  <section class="card namecard" id="cap-save"></section>
+  <div id="cap-recent"></div>`;
+}
+function locHint(){const t=normLoc(S.session.location);return t?`Di nama berkas: <span class="loctoken">${esc(t)}</span>${t!==S.session.location.trim()?" (huruf kecil, tanpa spasi)":""}`:"Ketik bebas. Spasi dan simbol dihapus otomatis di nama berkas."}
+function renderCaptureParts(){if(S.route!=="ambil"||!$("#cap-photo"))return;renderPhoto();renderGroup();renderCategory();renderSavebar();renderRecent();renderSteps()}
+function renderSteps(){
+  const m=draftMeta(),d=S.draft;
+  const marks={st1:!!(m.location&&m.lighting&&validYmd(m.date)),st2:!!d.blob,st3:!!m.code,st4:!!m.category};
+  for(const [id,done] of Object.entries(marks)){const el=$("#"+id);if(el){el.classList.toggle("done",done);el.innerHTML=done?ICON.check.replace('class="i"','class="i" style="width:15px;height:15px"'):id.slice(2)}}
+}
+function renderPhoto(){
+  const el=$("#cap-photo");if(!el)return;const d=S.draft,last=S.lastSaved;
+  let body;
+  if(d.blob){
+    body=`<div class="stage has"><img class="shot" src="${d.url}" alt="Foto yang baru diambil"><div class="badges"><span class="chip">${d.w}×${d.h} px</span><span class="chip">${Math.round(d.size/1024)} KB</span>${d.flags.map(f=>`<span class="chip warn">${f==="buram"?"Mungkin buram":"Resolusi kecil"}</span>`).join("")}</div></div>
+    <div class="row"><button class="btn" data-act="openCam">${ICON.redo} Ambil ulang</button><button class="btn ghost" data-act="pickLib">${ICON.img} Ganti dari galeri</button></div>
+    ${d.flags.includes("buram")?'<p class="note warn">Ketajaman foto rendah. Pertimbangkan ambil ulang dengan tangan lebih stabil atau cahaya lebih terang.</p>':""}`;
+  }else if(last){
+    body=`<div class="stage auto"><div class="saved"><div class="head"><span class="ok-ic">${ICON.check}</span><div class="stack" style="gap:2px;min-width:0"><b>Foto tersimpan</b><span class="mono small" style="word-break:break-all">${esc(last.filename)}</span></div></div>
+    <button class="btn soft lg block" data-act="again">${ICON.redo} Foto ulang objek ${esc(last.object_code)} · ulangan ${last.repetition_number+1}</button>
+    <button class="btn primary lg block" data-act="newObj">${ICON.cam} Foto objek baru</button>
+    <button class="btn ghost sm" data-act="pickLib" style="align-self:center">${ICON.img} Pilih dari galeri</button></div></div>`;
+  }else{
+    body=`<div class="stage"><div class="empty"><button class="bigcam" data-act="openCam" aria-label="Buka kamera">${ICON.cam}</button><div class="stack" style="gap:3px;align-items:center"><b>Ketuk untuk membuka kamera</b><span class="muted small" style="max-width:36ch">Satu foto berisi satu objek fisik. Letakkan objek di tengah bingkai.</span></div>
+    <button class="btn ghost sm" data-act="pickLib">${ICON.img} atau pilih dari galeri</button></div></div>`;
+  }
+  el.innerHTML=`<div class="card-h"><div class="lead"><span class="step" id="st2">2</span><h2>Foto</h2></div></div>${body}`;
+}
+function selectedGroup(){const gc=S.draft.groupChoice;if(!gc||gc==="new")return null;return S.groups.find(g=>g.id===gc)||null}
+function groupStats(){const m=new Map();for(const i of S.images){const e=m.get(i.group_id)||{n:0,first:null,last:""};e.n++;if(!e.first||i.repetition_number<e.first.repetition_number)e.first=i;if((i.created_at||"")>e.last)e.last=i.created_at||"";m.set(i.group_id,e)}return m}
+function renderGroup(){
+  const el=$("#cap-group");if(!el)return;const d=S.draft,gs=groupStats(),q=(S.gq||"").trim();
+  let list=S.groups.map(g=>({...g,_s:gs.get(g.id)||{n:0,last:g.updatedAt||g.createdAt||""}}));
+  list.sort((a,b)=>(b._s.last||"")>(a._s.last||"")?1:-1);
+  if(q)list=list.filter(g=>g.code.includes(q.replace(/\D/g,"")||"~")||(g.category||"").includes(q.toLowerCase()));
+  const nxt=pad4(nextCode(S.groups,S.counter)),sg=selectedGroup();
+  el.innerHTML=`<div class="card-h"><div class="lead"><span class="step" id="st3">3</span><h2>Objek fisik</h2></div><span class="muted small">${S.groups.length} objek tercatat</span></div>
+  <div class="objchoice">
+    <button class="objbtn" data-act="gnew" aria-pressed="${d.groupChoice==="new"}"><b>Objek baru</b><span>ID berikutnya</span><span class="big">${nxt}</span></button>
+    <button class="objbtn" data-act="gcont" aria-pressed="${!!sg}"><b>Foto ulang objek</b><span>${sg?"Ulangan berikutnya "+((sg.lastRep||0)+1):"Pilih di daftar bawah"}</span><span class="big">${sg?esc(sg.code):"––––"}</span></button>
+  </div>
+  ${d.similar?`<p class="note warn">Foto ini sangat mirip dengan objek <b class="mono">${esc(d.similar.code)}</b> (<span class="mono">${esc(d.similar.filename)}</span>). Jika objek fisiknya sama, pilih objek itu. <button class="btn sm" data-act="gpick" data-v="${esc(d.similar.group_id)}">Pakai ${esc(d.similar.code)}</button></p>`:""}
+  ${S.groups.length?`<input type="search" id="g-q" placeholder="Cari ID objek atau kategori" value="${esc(S.gq||"")}" aria-label="Cari objek">
+  <div class="glist" role="listbox" aria-label="Daftar objek">${list.slice(0,60).map(g=>`<button class="gitem ${clsOf(g.category)}" style="${clsStyle(g.category)}" data-act="gpick" data-v="${esc(g.id)}" aria-pressed="${d.groupChoice===g.id}">
+    <span class="th">${g._s.first?`<img data-blob="${esc(g._s.first.asset_id)}" alt="">`:""}</span>
+    <span class="gi"><b>${esc(g.code)}</b><span>${esc(catName(g.category))} · ${g._s.n} foto</span></span>${d.groupChoice===g.id?ICON.check:""}</button>`).join("")||'<p class="muted small">Tidak ada objek yang cocok.</p>'}</div>`:`<p class="muted small">Belum ada objek. Pilih “Objek baru” untuk foto pertama.</p>`}`;
+  hydrate(el);renderSteps();
+}
+function catName(code){const c=((S.project&&S.project.categories)||[]).find(x=>x.code===code);return c?c.name:code||"–"}
+function renderCategory(){
+  const el=$("#cap-cat");if(!el)return;
+  const d=S.draft,g=selectedGroup(),cats=(S.project.categories||[]).filter(c=>c.active!==false);
+  const ai=d.ai,pred=ai.status==="done"?ai:null;
+  const confOf=code=>{if(!pred)return null;if(pred.category===code)return pred.confidence;const a=(pred.alternatives||[]).find(x=>x.category===code);return a?a.confidence:null};
+  let status="";
+  if(g)status="";
+  else if(ai.status==="running")status=`<span class="chip acc"><span class="spin" style="width:11px;height:11px"></span> AI menganalisis…</span>`;
+  else if(ai.status==="done"&&pred.lowConf)status=`<span class="chip warn">AI ragu, pilih manual</span>`;
+  else if(ai.status==="done")status=`<span class="chip acc">${ICON.ai.replace('class="i"','class="i" style="width:14px;height:14px"')} Saran AI ${Math.round((pred.confidence||0)*100)}%</span>`;
+  else if(ai.status==="error")status=`<span class="chip warn">AI tidak tersedia</span>`;
+  else if(!aiOn())status=`<span class="chip">Manual</span>`;
+  else{const st=aiStatusLine();status=`<span class="chip ${st.chip}">${esc(st.text)}</span>`}
+  const chosen=g?g.category:d.category;
+  el.innerHTML=`<div class="card-h"><div class="lead"><span class="step" id="st4">4</span><h2>Kategori</h2></div>${status}</div>
+  ${g?`<p class="note acc">Mengikuti objek <b class="mono">${esc(g.code)}</b>: <b>${esc(catName(g.category))}</b>. Satu objek fisik punya satu kategori; pemeriksa bisa mengoreksinya di Galeri.</p>`:""}
+  <div class="clsgrid" role="group" aria-label="Pilih kategori">${cats.map(c=>{const cf=g?null:confOf(c.code);const isPred=!g&&pred&&pred.category===c.code;return `<button class="clsbtn ${clsOf(c.code)}" style="${clsStyle(c.code)}" data-act="cat" data-v="${esc(c.code)}" aria-pressed="${chosen===c.code}" ${g?"disabled":""}>
+    ${isPred?'<span class="ai">AI</span>':""}<b><i></i>${esc(c.name)}</b>${cf!=null?`<span class="conf">${Math.round(cf*100)}%</span><span class="cbar"><span style="width:${Math.round(cf*100)}%"></span></span>`:`<span class="conf mono">${esc(c.code)}</span>`}</button>`}).join("")}</div>
+  ${!g&&pred&&pred.reason?`<p class="muted small">${esc(pred.reason)}</p>`:""}
+  ${!g&&ai.status==="error"?`<p class="note warn">${esc(ai.message||"Prediksi gagal.")} Pilih kategori secara manual.</p>`:""}
+  ${!g&&pred&&!pred.lowConf&&d.category&&d.category!==pred.category?`<p class="note">Koreksi manual: AI menyarankan <b>${esc(catName(pred.category))}</b>. Saran awal tetap dicatat di metadata.</p>`:""}
+  ${!g&&aiOn()&&(AI.state==="absent"||(AI.state==="error"&&!AI.cached))&&AI.meta?`<div class="note stack" style="gap:8px"><b>Saran kategori AI belum aktif di perangkat ini</b><span>Unduh model sekali (${mb((AI.meta.files.model_bytes||0)+(AI.meta.files.wasm_bytes||0))}). Setelah itu foto dianalisis langsung di perangkat tanpa dikirim ke layanan AI.</span><button class="btn sm primary" data-act="aiDownload" style="align-self:flex-start">Unduh model</button></div>`:""}
+  ${!g&&aiOn()&&AI.state==="downloading"?`<div class="stack" style="gap:4px"><div class="progress"><span style="width:${AI.progress}%"></span></div><span class="muted small">Mengunduh model ${AI.progress}%. Anda bisa lanjut memilih kategori manual.</span></div>`:""}
+  ${!g&&aiOn()&&AI.state==="error"&&AI.err?`<p class="note warn">${esc(AI.err)}</p>`:""}
+  ${!g&&d.blob&&aiReady()&&ai.status!=="running"?`<button class="btn sm ghost" data-act="runAI" style="align-self:flex-start">${ICON.ai} ${ai.status==="done"?"Analisis ulang":"Minta saran AI"}</button>`:""}`;
+  renderSteps();
+}
+function draftMeta(){
+  const s=S.session,d=S.draft,g=selectedGroup();
+  let code=null,rep=null,codeProjected=false,repProjected=false;
+  if(d.groupChoice==="new"){code=pad4(nextCode(S.groups,S.counter));rep=1;codeProjected=true}
+  else if(g){code=g.code;rep=(g.lastRep||0)+1;repProjected=true}
+  return {category:g?g.category:d.category,location:normLoc(s.location),lighting:s.lighting,date:isoToYmd(s.dateIso),photographer:S.me.photographer_code,code,rep,codeProjected,repProjected};
+}
+function renderSavebar(){
+  const el=$("#cap-save");if(!el)return;
+  const m=draftMeta(),r=buildFilename(m,{categories:S.project.categories,lightings:lightsOf()}),d=S.draft;
+  const errs=[...r.errors];if(!d.blob)errs.unshift("Ambil atau pilih foto.");
+  el.innerHTML=`<div class="card-h"><div class="lead"><span class="step" style="background:var(--accent);color:var(--accent-ink)">${ICON.check.replace('class="i"','class="i" style="width:15px;height:15px"')}</span><h2>Nama berkas</h2></div>${r.ok&&d.blob?'<span class="chip ok">Siap disimpan</span>':""}</div>
+  <div class="fname" aria-label="Pratinjau nama berkas">${r.parts.map((p,i)=>`${i?'<span class="sepc">_</span>':""}<span class="tok ${p.miss?"miss":""} ${p.proj?"proj":""}"><code>${esc(p.value||"…")}</code><small>${esc(p.label)}</small></span>`).join("")}<span class="sepc">.jpg</span></div>
+  ${(m.codeProjected||m.repProjected)&&r.ok?`<span class="muted small">Kotak bergaris putus: nomor ditetapkan final oleh server saat foto berhasil disimpan.</span>`:""}
+  ${errs.length?`<ul class="errs">${errs.map(e=>`<li>${esc(e)}</li>`).join("")}</ul>`:""}
+  <div class="row" style="justify-content:flex-end"><button class="btn" data-act="copyName" ${r.ok?"":"disabled"} data-name="${esc(r.name||"")}">${ICON.copy} Salin nama</button>
+  <button class="btn primary lg" data-act="save" ${r.ok&&d.blob&&!S.busy?"":"disabled"} style="flex:1;max-width:340px">${S.busy?'<span class="spin" style="border-top-color:#fff"></span> Menyimpan…':ICON.check+" Simpan foto"}</button></div>`;
+  renderSteps();
+}
+function renderRecent(){
+  const el=$("#cap-recent");if(!el)return;
+  if(!S.recent.length){el.innerHTML="";return}
+  el.innerHTML=`<section class="card" style="gap:9px"><div class="card-h"><h3>Tersimpan di sesi ini</h3><span class="muted small">${S.recent.length} foto</span></div><div class="recent">${S.recent.slice(0,10).map(r=>`<figure><div class="th"><img data-blob="${esc(r.asset_id)}" alt=""></div><figcaption>${esc(r.filename)}</figcaption></figure>`).join("")}</div></section>`;
+  hydrate(el);
+}
+
+/* camera */
+function camHTML(){
+  const c=S.cam,g=selectedGroup();
+  const title=g?`Objek ${g.code} · ulangan ${(g.lastRep||0)+1}`:S.draft.groupChoice==="new"?`Objek baru ${pad4(nextCode(S.groups,S.counter))}`:"Ambil foto";
+  let mid="";
+  if(c.state==="opening")mid=`<div class="msg"><div class="stack" style="align-items:center"><span class="spin" style="width:28px;height:28px;border-width:3px"></span><span>Membuka kamera…</span></div></div>`;
+  else if(c.state==="error")mid=`<div class="msg"><div class="stack" style="align-items:center;gap:14px;max-width:420px"><b style="font-size:1.05rem">Kamera langsung tidak dapat dibuka</b><span style="opacity:.85;font-size:.9rem">${esc(c.err)}</span>
+    <button class="btn primary lg" data-act="nativeCam">${ICON.cam} Buka aplikasi kamera perangkat</button><button class="btn lg" data-act="pickLib" style="background:rgba(255,255,255,.12);color:#fff;border-color:rgba(255,255,255,.25)">${ICON.img} Pilih dari galeri</button></div></div>`;
+  return `<div class="cam" role="dialog" aria-modal="true" aria-label="Kamera">
+    <video id="vid" autoplay playsinline muted ${c.state==="live"?"":"hidden"}></video>${c.state==="live"?'<div class="guide"><span>Letakkan objek di dalam kotak</span></div>':""}<div class="flash" id="flash"></div>${mid}
+    <div class="bar"><button class="rb" data-act="closeCam" aria-label="Tutup kamera">${ICON.x}</button><b>${esc(title)}</b>${c.devices.length>1&&c.state==="live"?`<button class="rb" data-act="flip" aria-label="Ganti kamera">${ICON.flip}</button>`:'<span style="width:48px"></span>'}</div>
+    ${c.state==="live"?`<div class="bot"><button class="rb" data-act="pickLib" aria-label="Pilih dari galeri" style="justify-self:start">${ICON.img}</button><button class="shutter" data-act="snap" aria-label="Ambil foto"></button><span></span></div>`:""}
+  </div>`;
+}
+function renderCam(){const root=$("#camroot");if(!S.cam.open){root.innerHTML="";document.body.style.overflow="";return}root.innerHTML=camHTML();document.body.style.overflow="hidden";const v=$("#vid");if(v&&S.cam.stream&&v.srcObject!==S.cam.stream){v.srcObject=S.cam.stream;v.play().catch(()=>{})}}
+async function openCamera(){
+  const c=S.cam;c.open=true;c.err=null;
+  if(!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)){c.state="error";c.err=location.protocol!=="https:"&&!/^(localhost|127\.0\.0\.1)$/.test(location.hostname)?"Kamera langsung butuh alamat HTTPS.":"Browser ini tidak mendukung kamera langsung.";renderCam();return}
+  c.state="opening";renderCam();
+  try{
+    if(c.stream)c.stream.getTracks().forEach(t=>t.stop());
+    c.stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:c.facing},width:{ideal:1920},height:{ideal:1440}},audio:false});
+    if(!c.open){c.stream.getTracks().forEach(t=>t.stop());c.stream=null;return}
+    try{c.devices=(await navigator.mediaDevices.enumerateDevices()).filter(x=>x.kind==="videoinput")}catch{c.devices=[]}
+    c.state="live";renderCam();
+  }catch(e){
+    c.stream=null;c.state="error";
+    c.err=IS_PREVIEW||IS_ARTIFACT?"Pratinjau di Claude tidak diizinkan memakai kamera langsung. Di versi online (GitHub Pages), tombol ini langsung membuka kamera.":
+      e&&e.name==="NotAllowedError"?"Izin kamera ditolak. Izinkan kamera untuk situs ini di pengaturan browser, lalu coba lagi.":
+      e&&e.name==="NotFoundError"?"Tidak ada kamera yang terdeteksi di perangkat ini.":"Kamera sedang dipakai aplikasi lain atau tidak dapat diakses.";
+    renderCam();
+  }
+}
+function stopCamera(silent){const c=S.cam;if(c.stream)c.stream.getTracks().forEach(t=>t.stop());c.stream=null;c.open=false;c.state="idle";if(!silent||$("#camroot").innerHTML)renderCam()}
+async function snap(){
+  const v=$("#vid");if(!v||!v.videoWidth)return toast("Kamera belum siap.","bad");
+  const f=$("#flash");if(f){f.classList.remove("on");void f.offsetWidth;f.classList.add("on")}
+  const cv=document.createElement("canvas");cv.width=v.videoWidth;cv.height=v.videoHeight;cv.getContext("2d").drawImage(v,0,0);
+  const blob=await new Promise(r=>cv.toBlob(r,"image/jpeg",0.95));
+  setTimeout(()=>stopCamera(),180);
+  await ingest(blob,null);
+}
+async function ingest(file,origName){
+  try{
+    const cfg=S.project,bmp=await loadBitmap(file),cv=drawScaled(bmp,+cfg.maxDim||0);
+    const blob=await new Promise(r=>cv.toBlob(r,"image/jpeg",+cfg.jpegQuality||0.9));
+    if(!blob)throw new Error("Konversi JPEG gagal.");
+    const flags=[],bs=blurScore(cv);if(bs<45)flags.push("buram");if(Math.min(cv.width,cv.height)<224)flags.push("kecil");
+    const hash=dhash(cv),d=S.draft;if(d.url)URL.revokeObjectURL(d.url);
+    if(!d.groupChoice)d.groupChoice=S.groups.length?null:"new";
+    Object.assign(d,{blob,url:URL.createObjectURL(blob),w:cv.width,h:cv.height,size:blob.size,blur:Math.round(bs),hash,flags,origName,ai:{status:"idle"},similar:null});
+    let best=null;for(const i of S.images){if(!i.hash)continue;const dd=hamming(i.hash,hash);if(dd<=6&&(!best||dd<best.d))best={d:dd,filename:i.filename,code:i.object_code,group_id:i.group_id}}
+    if(best&&best.group_id!==d.groupChoice)d.similar=best;
+    S.lastSaved=null;renderCaptureParts();
+    if(aiOn()&&!selectedGroup()&&(AI.state==="ready"||AI.state==="cached"||AI.state==="loading"))runAI();
+  }catch(e){toast("Gambar tidak dapat diproses: "+(e.message||e),"bad")}
+}
+async function runAI(){
+  const d=S.draft;if(!d.blob||!aiOn())return;
+  const token=d.blob;d.ai={status:"running"};renderCategory();
+  try{
+    const r=await aiClassify(d.blob);if(S.draft.blob!==token)return;
+    d.ai={status:"done",...r};
+    if(!r.lowConf&&!d.category)d.category=r.category;
+    let best=null;for(const i of S.images){if(!i.emb||i.emb_v!==AI_CFG.version)continue;const sim=dot(r.embVec,embDecode(i.emb,i.emb_scale));if(sim>=0.93&&(!best||sim>best.s))best={s:sim,filename:i.filename,code:i.object_code,group_id:i.group_id}}
+    if(best&&best.group_id!==d.groupChoice&&!d.similar)d.similar=best;
+  }catch(e){if(S.draft.blob!==token)return;d.ai={status:"error",message:(e&&e.message)||"Prediksi gagal."}}
+  renderCategory();renderGroup();renderSavebar();
+}
+async function saveDraft(){
+  if(S.busy)return;
+  const d=S.draft,s=S.session,m=draftMeta(),pre=buildFilename(m,{categories:S.project.categories,lightings:lightsOf()});
+  if(!d.blob||!pre.ok){renderSavebar();return toast("Lengkapi data yang ditandai merah sebelum menyimpan.","bad")}
+  S.busy=true;renderSavebar();
+  const isNew=d.groupChoice==="new",ai=d.ai.status==="done"?d.ai:null,now=new Date().toISOString();
+  const row={id:uid(),category_predicted:ai?ai.category:null,ai_confidence:ai?Math.round(ai.confidence*1000)/1000:null,ai_alternatives:ai?ai.alternatives:[],ai_reason:ai?ai.reason:null,ai_model:ai?ai.model:null,ai_ms:ai?ai.ms:null,ai_knn_refs:ai?ai.knnRefs:null,emb:ai?ai.emb:null,emb_scale:ai?ai.embScale:null,emb_v:ai?AI_CFG.version:null,ai_status:d.ai.status==="error"?"gagal":ai?"selesai":"tidak dijalankan",
+    category_source:!isNew?"objek":ai&&ai.category===m.category&&!ai.lowConf?"ai_dikonfirmasi":ai?"koreksi_manual":"manual",
+    captured_at:now,width:d.w,height:d.h,size_bytes:d.size,blur_score:d.blur,quality_flags:d.flags,hash:d.hash,original_name:d.origName||null,note:(d.note||"").trim(),label_updated_at:null};
+  try{
+    const saved=await S.store.saveImage({pid:S.pid,groupId:isNew?null:d.groupChoice,category:isNew?m.category:null,location:m.location,lighting:m.lighting,date:m.date,blob:d.blob,row});
+    S.lastSaved=saved;S.recent.unshift(saved);S.store.patchImage(saved);
+    const gsel=S.groups.find(g=>g.id===saved.group_id);if(gsel)gsel.lastRep=Math.max(gsel.lastRep||0,saved.repetition_number);
+    else S.groups.push({id:saved.group_id,code:saved.group_id,category:saved.category_confirmed,lastRep:saved.repetition_number,createdAt:now,updatedAt:now});
+    if(isNew)S.counter=Math.max(S.counter,+saved.group_id);
+    if(d.url)URL.revokeObjectURL(d.url);
+    S.draft=newDraft(null);
+    toast("Tersimpan: "+saved.filename,"ok");
+  }catch(e){toast("Gagal menyimpan: "+errMsg(e)+" Foto belum tersimpan dan tidak ada nomor yang terpakai.","bad")}
+  finally{S.busy=false;renderCaptureParts();const n=$("#d-note");if(n)n.value=S.draft.note;if(S.lastSaved)$("#cap-photo")?.scrollIntoView({behavior:"smooth",block:"start"})}
+}
+
+/* ---------- gallery ---------- */
+function filteredImages(){
+  const f=S.gf,q=f.q.trim().toLowerCase();
+  return S.images.filter(i=>(!q||(i.filename||"").toLowerCase().includes(q)||(i.note||"").toLowerCase().includes(q))&&(!f.cat||i.category_confirmed===f.cat)&&(!f.loc||i.location===f.loc)&&(!f.ph||i.photographer_code===f.ph)&&(!f.date||i.capture_date===isoToYmd(f.date))&&(!f.code||i.object_code===pad4(f.code.replace(/\D/g,"")||"0"))&&(!f.status||(f.status==="pending"?i.verification_status!=="verified":i.verification_status===f.status)))
+    .sort((a,b)=>(b.created_at||"")>(a.created_at||"")?1:-1);
+}
+function viewGallery(){
+  const cfg=S.project,f=S.gf,list=filteredImages();
+  const opt=(arr,v)=>arr.map(([val,lab])=>`<option value="${esc(val)}" ${v===val?"selected":""}>${esc(lab)}</option>`).join("");
+  const locs=[...new Set(S.images.map(i=>i.location).filter(Boolean))].sort(),phs=[...new Set(S.images.map(i=>i.photographer_code).filter(Boolean))].sort();
+  const pendingShown=list.filter(i=>i.verification_status!=="verified").length;
+  const active=Object.values(f).some(Boolean);
+  return pageHead("Galeri",`${fmtInt(list.length)} dari ${fmtInt(S.images.length)} foto`)+`
+  <section class="card"><div class="filters">
+    <input class="q" type="search" id="gf-q" placeholder="Cari nama berkas atau catatan" value="${esc(f.q)}" aria-label="Cari">
+    <select id="gf-cat" aria-label="Kategori"><option value="">Semua kategori</option>${opt((cfg.categories||[]).map(c=>[c.code,c.name]),f.cat)}</select>
+    <select id="gf-loc" aria-label="Lokasi"><option value="">Semua lokasi</option>${opt(locs.map(l=>[l,l]),f.loc)}</select>
+    <select id="gf-ph" aria-label="Fotografer"><option value="">Semua fotografer</option>${opt(phs.map(p=>[p,p+(nameOfCode(p)?" · "+nameOfCode(p):"")]),f.ph)}</select>
+    <select id="gf-status" aria-label="Status"><option value="">Semua status</option>${opt([["pending","Belum diverifikasi"],["verified","Terverifikasi"],["flagged","Perlu dicek"]],f.status)}</select>
+    <input type="text" id="gf-code" inputmode="numeric" placeholder="ID objek" value="${esc(f.code)}" aria-label="ID objek">
+  </div>
+  <div class="row" style="justify-content:space-between">
+    <div class="row"><input type="date" id="gf-date" value="${esc(f.date)}" aria-label="Tanggal" style="width:auto">${active?'<button class="btn sm ghost" data-act="gfreset">Hapus filter</button>':""}</div>
+    <div class="row">${can("pemeriksa")&&pendingShown?`<button class="btn sm" data-act="bulkVerify">${ICON.check} Verifikasi ${pendingShown} foto</button>`:""}
+    <div class="seg inline" role="group" aria-label="Tampilan"><button data-act="galView" data-v="grid" aria-pressed="${S.galView==="grid"}">Grid</button><button data-act="galView" data-v="table" aria-pressed="${S.galView==="table"}">Tabel</button></div></div>
+  </div><div id="bulkConfirm"></div></section>
+  ${!list.length?`<div class="empty-state"><div class="ic">${ICON.img}</div><h2>${S.images.length?"Tidak ada foto yang cocok":"Galeri masih kosong"}</h2><p>${S.images.length?"Ubah atau hapus filter untuk melihat foto lain.":"Foto yang disimpan akan muncul di sini beserta metadatanya."}</p>${S.images.length?"":`<a class="btn primary" href="#ambil">${ICON.cam} Ambil foto</a>`}</div>`:
+  S.galView==="grid"?`<div class="gal">${list.slice(0,400).map(tile).join("")}</div>${list.length>400?`<p class="muted">Menampilkan 400 foto terbaru. Persempit filter untuk melihat yang lain.</p>`:""}`:
+  `<section class="card" style="padding:0"><div class="tscroll"><table class="t"><thead><tr><th>Nama berkas</th><th>Kategori</th><th>Saran AI</th><th>ID</th><th>Lokasi</th><th>Cahaya</th><th>Fotografer</th><th>Tanggal</th><th>Status</th></tr></thead><tbody>
+  ${list.slice(0,1000).map(i=>`<tr class="click" data-act="open" data-v="${esc(i.id)}"><td class="mono" style="font-size:.74rem;white-space:nowrap">${esc(i.filename)}</td><td>${esc(catName(i.category_confirmed))}</td><td>${i.category_predicted?esc(i.category_predicted)+" "+Math.round((i.ai_confidence||0)*100)+"%":"–"}</td><td class="mono">${esc(i.object_code)}</td><td>${esc(i.location)}</td><td>${esc(i.lighting)}</td><td>${esc(i.photographer_code)}</td><td>${esc(fmtYmd(i.capture_date))}</td><td>${statusChip(i)}</td></tr>`).join("")}</tbody></table></div></section>`}`;
+}
+function statusChip(i){return i.verification_status==="verified"?'<span class="chip ok">Terverifikasi</span>':i.verification_status==="flagged"?'<span class="chip bad">Perlu dicek</span>':'<span class="chip">Belum</span>'}
+function tile(i){const c=i.category_confirmed;return `<button class="tile ${clsOf(c)}" style="${clsStyle(c)}" data-act="open" data-v="${esc(i.id)}"><div class="th"><img data-blob="${esc(i.asset_id)}" alt="" loading="lazy"><span class="chip">${esc(catName(c))} · ${esc(i.object_code)}</span><span class="st">${i.verification_status==="verified"?'<span class="chip ok">✓</span>':i.verification_status==="flagged"?'<span class="chip bad">!</span>':""}</span></div><div class="meta"><code>${esc(i.filename)}</code></div></button>`}
+function hydrate(root){
+  if(!S.store)return;
+  for(const im of (root||document).querySelectorAll("img[data-blob]:not([src])")){const id=im.dataset.blob;if(!id)continue;S.store.url(id).then(u=>{im.src=u}).catch(()=>{im.alt="Foto tidak tersedia"})}
+}
+function openDetail(id){S.modal={id,confirmDel:false,editCat:false};renderModal()}
+function closeModal(){S.modal=null;const r=$("#modalroot");if(r)r.innerHTML=""}
+function renderModal(){
+  const m=S.modal;if(!m)return;
+  const i=S.images.find(x=>x.id===m.id);if(!i){closeModal();return}
+  const g=S.groups.find(x=>x.id===i.group_id);
+  const sibs=S.images.filter(x=>x.group_id===i.group_id).sort((a,b)=>a.repetition_number-b.repetition_number);
+  const list=filteredImages(),idx=list.findIndex(x=>x.id===i.id),cats=(S.project.categories||[]).filter(c=>c.active!==false);
+  const kv=[["Kategori final",catName(i.category_confirmed)],["Sumber label",i.category_source||"–"],["Saran AI",i.category_predicted?`${catName(i.category_predicted)} (${Math.round((i.ai_confidence||0)*100)}%)`:i.ai_status||"–"],["Alternatif AI",(i.ai_alternatives||[]).map(a=>`${a.category} ${Math.round(a.confidence*100)}%`).join(", ")||"–"],
+    ["ID objek",i.object_code],["Ulangan",i.repetition_number],["Lokasi",i.location],["Cahaya",i.lighting],["Fotografer",`${i.photographer_code}${nameOfCode(i.photographer_code)?" · "+nameOfCode(i.photographer_code):""}`],["Tanggal",fmtYmd(i.capture_date)],["Disimpan",fmtDate(i.created_at)],
+    ["Resolusi",`${i.width}×${i.height} px · ${Math.round((i.size_bytes||0)/1024)} KB`],["Ketajaman",i.blur_score!=null?i.blur_score+((i.quality_flags||[]).includes("buram")?" (mungkin buram)":""):"–"],["Waktu AI",i.ai_ms!=null?i.ai_ms+" ms":"–"],["Diverifikasi",i.reviewed_by?`${i.reviewed_by} · ${fmtDate(i.reviewed_at)}`:"–"],["Catatan",i.note||"–"]];
+  $("#modalroot").innerHTML=`<div class="modal" data-act="modalBg"><div class="sheet" role="dialog" aria-modal="true" aria-label="Detail foto">
+    <div class="pic"><img data-blob="${esc(i.asset_id)}" alt="${esc(i.filename)}"></div>
+    <div class="side2">
+      <div class="row" style="justify-content:space-between"><div class="row" style="gap:6px">${statusChip(i)}</div>
+      <div class="row" style="gap:4px"><button class="btn sm iconbtn" data-act="nav" data-v="${idx-1}" ${idx>0?"":"disabled"} aria-label="Sebelumnya">‹</button><button class="btn sm iconbtn" data-act="nav" data-v="${idx+1}" ${idx>=0&&idx<list.length-1?"":"disabled"} aria-label="Berikutnya">›</button><button class="btn sm iconbtn" data-act="close" aria-label="Tutup">${ICON.x}</button></div></div>
+      <div class="fname-plain">${esc(i.filename)}</div>
+      <div class="stack" style="gap:6px"><span class="eyebrow">Objek ${esc(i.object_code)} · ${sibs.length} foto</span>
+      <div class="grpstrip">${sibs.map(x=>`<button data-act="open" data-v="${esc(x.id)}" aria-current="${x.id===i.id}" aria-label="Ulangan ${x.repetition_number}"><img data-blob="${esc(x.asset_id)}" alt=""><span>${x.repetition_number}</span></button>`).join("")}</div></div>
+      ${can("pemeriksa")?`<div class="row" style="gap:6px">
+        ${i.verification_status!=="verified"?`<button class="btn sm primary" data-act="setStatus" data-v="verified">${ICON.check} Verifikasi</button>`:`<button class="btn sm" data-act="setStatus" data-v="pending">Batalkan verifikasi</button>`}
+        ${i.verification_status!=="flagged"?`<button class="btn sm" data-act="setStatus" data-v="flagged">Tandai perlu dicek</button>`:""}
+        <button class="btn sm" data-act="editCat">Koreksi kategori</button><button class="btn sm danger" data-act="askDel">Hapus</button></div>`:""}
+      ${m.editCat&&g?`<div class="note stack" style="gap:8px"><b>Ubah kategori objek ${esc(g.code)}</b><span>Semua ${sibs.length} foto objek ini berganti kategori dan nama berkasnya disusun ulang. Saran AI awal tetap tersimpan.</span>
+        <div class="clsgrid">${cats.map(c=>`<button class="clsbtn ${clsOf(c.code)}" style="${clsStyle(c.code)}min-height:46px" data-act="applyCat" data-v="${esc(c.code)}" aria-pressed="${g.category===c.code}"><b><i></i>${esc(c.name)}</b></button>`).join("")}</div><button class="btn sm ghost" data-act="editCat" style="align-self:flex-start">Batal</button></div>`:""}
+      ${m.confirmDel?`<div class="note bad stack" style="gap:8px"><b>Hapus foto ini permanen?</b><span>Berkas dan metadatanya dihapus. Nomor ulangan ${i.repetition_number} tidak dipakai ulang.</span><div class="row"><button class="btn sm danger solid" data-act="doDel">Ya, hapus</button><button class="btn sm" data-act="askDel">Batal</button></div></div>`:""}
+      <dl class="kv">${kv.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
+    </div></div></div>`;
+  hydrate($("#modalroot"));
+}
+async function setStatus(ids,status){try{await S.store.setStatus(S.pid,ids,status);toast(ids.length>1?`${ids.length} foto diperbarui.`:"Status diperbarui.","ok")}catch(e){toast("Gagal memperbarui status: "+errMsg(e),"bad")}}
+async function changeGroupCategory(gid,cat){
+  const g=S.groups.find(x=>x.id===gid);if(!g||g.category===cat){if(S.modal){S.modal.editCat=false;renderModal()}return}
+  try{await S.store.relabelGroup(S.pid,gid,cat);toast(`Objek ${g.code} kini berkategori ${catName(cat)}.`,"ok")}catch(e){toast("Koreksi gagal: "+errMsg(e),"bad")}
+  if(S.modal){S.modal.editCat=false;setTimeout(renderModal,200)}
+}
+async function deleteImage(id){const i=S.images.find(x=>x.id===id);if(!i)return;try{await S.store.deleteImage(S.pid,i);toast("Foto dihapus: "+i.filename,"ok")}catch(e){toast("Gagal menghapus: "+errMsg(e),"bad")}}
+
+/* ---------- export ---------- */
+function exportSelection(){
+  const o=S.exportOpts;
+  const images=S.images.filter(i=>o.scope!=="verified"||i.verification_status==="verified").slice().sort((a,b)=>a.filename<b.filename?-1:1);
+  const gids=new Set(images.map(i=>i.group_id));
+  return {images,groups:S.groups.filter(g=>gids.has(g.id))};
+}
+function viewExport(){
+  const o=S.exportOpts,st=stats(),sel=exportSelection();
+  const sp=o.split?splitGroups(sel.groups,{train:+o.train||0,val:+o.val||0,test:+o.test||0},o.seed):null;
+  const cnt={train:{p:0,g:0},val:{p:0,g:0},test:{p:0,g:0}};
+  if(sp){for(const g of sel.groups)cnt[sp.get(g.id)].g++;for(const i of sel.images)cnt[sp.get(i.group_id)].p++}
+  return pageHead("Ekspor dataset",`${fmtInt(sel.images.length)} foto dari ${fmtInt(sel.groups.length)} objek akan diekspor`)+`
+  <div class="grid2">
+    <section class="card"><h2>Cakupan</h2>
+      <div class="seg" role="group"><button data-act="eo" data-k="scope" data-v="all" aria-pressed="${o.scope==="all"}">Semua foto<small>${fmtInt(st.total)}</small></button><button data-act="eo" data-k="scope" data-v="verified" aria-pressed="${o.scope==="verified"}">Hanya terverifikasi<small>${fmtInt(st.verified)}</small></button></div>
+      <hr class="sep"><h2>Susunan folder gambar</h2>
+      <div class="seg" role="group"><button data-act="eo" data-k="layout" data-v="flat" aria-pressed="${o.layout==="flat"}">images/<small>datar</small></button><button data-act="eo" data-k="layout" data-v="split" aria-pressed="${o.layout==="split"}" ${o.split?"":"disabled"}>images/split/kelas/<small>PyTorch · Keras</small></button></div>
+      <pre class="mono note" style="margin:0;font-size:.76rem;overflow-x:auto;white-space:pre">dataset_export/
+├── images/${o.layout==="split"&&o.split?"train/plastik/…jpg":"plastik_kantin_in_…_0007_2.jpg"}
+├── metadata.csv
+├── metadata.json
+├── dataset_summary.json
+${o.split?"├── splits.csv\n":""}└── README.txt</pre></section>
+    <section class="card"><div class="card-h"><h2>Pembagian per objek fisik</h2><label class="row small" style="font-weight:650"><input type="checkbox" id="eo-split" ${o.split?"checked":""}> Aktif</label></div>
+      <p class="muted small">Semua foto dari satu ID objek masuk ke satu kelompok saja, jadi objek yang sama tidak muncul di data latih dan data uji sekaligus. Dibagi per kategori agar proporsinya seimbang.</p>
+      ${o.split?`<div class="grid3" style="gap:8px"><label class="field">Train %<input type="number" min="0" max="100" id="eo-train" value="${esc(o.train)}"></label><label class="field">Validation %<input type="number" min="0" max="100" id="eo-val" value="${esc(o.val)}"></label><label class="field">Test %<input type="number" min="0" max="100" id="eo-test" value="${esc(o.test)}"></label></div>
+      <label class="field" style="max-width:200px">Seed acak<input type="text" id="eo-seed" value="${esc(o.seed)}"></label>
+      <div class="tscroll"><table class="t"><thead><tr><th>Kelompok</th><th style="text-align:right">Objek</th><th style="text-align:right">Foto</th></tr></thead><tbody>${["train","val","test"].map(k=>`<tr><td>${k}</td><td style="text-align:right">${fmtInt(cnt[k].g)}</td><td style="text-align:right">${fmtInt(cnt[k].p)}</td></tr>`).join("")}</tbody></table></div>`:""}
+    </section>
+  </div>
+  <section class="card"><h2>Unduh</h2>
+    <div class="row"><button class="btn primary lg" data-act="exportZip" ${sel.images.length&&!S.exporting?"":"disabled"}>${ICON.box} Unduh ZIP gambar + metadata</button>
+      <button class="btn" data-act="exportCsv" ${sel.images.length?"":"disabled"}>metadata.csv</button><button class="btn" data-act="exportJson" ${sel.images.length?"":"disabled"}>metadata.json</button></div>
+    <div id="exportProgress"></div><p class="muted small">Unduh ZIP secara berkala sebagai cadangan. Paket gratis Supabase menyimpan foto hingga 1 GB.</p>
+  </section>`;
+}
+const CSV_COLS=["filename","file_path","split","category_confirmed","category_predicted","ai_confidence","category_source","object_code","repetition_number","location","lighting","photographer_code","capture_date","captured_at","width","height","size_bytes","blur_score","quality_flags","verification_status","reviewed_by","note","ai_model","ai_ms","ai_status","label_updated_at","created_by_username","id","project_id"];
+function exportRows(){
+  const o=S.exportOpts,sel=exportSelection();
+  const sp=o.split?splitGroups(sel.groups,{train:+o.train||0,val:+o.val||0,test:+o.test||0},o.seed):null;
+  const rows=sel.images.map(i=>{const split=sp?sp.get(i.group_id):"";return {...i,split,file_path:o.layout==="split"&&sp?`images/${split}/${i.category_confirmed}/${i.filename}`:`images/${i.filename}`}});
+  return {rows,sel,sp};
+}
+function cleanRow(r){const {hash,asset_id,original_name,ai_alternatives,emb,emb_scale,emb_v,...rest}=r;return {...rest,ai_alternatives:(ai_alternatives||[]).map(a=>a.category+":"+a.confidence)}}
+function summaryOf(rows,sp){
+  const by=k=>rows.reduce((m,r)=>{const v=r[k]||"–";m[v]=(m[v]||0)+1;return m},{});
+  const perCat={};for(const r of rows){const c=r.category_confirmed;perCat[c]=perCat[c]||{photos:0,objects:new Set()};perCat[c].photos++;perCat[c].objects.add(r.group_id)}
+  const splits={};if(sp)for(const r of rows){splits[r.split]=splits[r.split]||{photos:0,objects:new Set()};splits[r.split].photos++;splits[r.split].objects.add(r.group_id)}
+  const conv=o=>Object.fromEntries(Object.entries(o).map(([k,v])=>[k,{photos:v.photos,objects:v.objects.size}]));
+  return {project:{id:S.pid,name:S.project.name,description:S.project.description},generated_at:new Date().toISOString(),generated_by:S.me.username,scope:S.exportOpts.scope==="verified"?"terverifikasi":"semua",
+    total_photos:rows.length,unique_objects:new Set(rows.map(r=>r.group_id)).size,per_category:conv(perCat),per_location:by("location"),per_lighting:by("lighting"),per_photographer:by("photographer_code"),
+    split:sp?{method:"per ID objek fisik, stratifikasi per kategori",ratios:{train:+S.exportOpts.train,val:+S.exportOpts.val,test:+S.exportOpts.test},seed:S.exportOpts.seed,counts:conv(splits)}:null,
+    naming:"<kelas>_<lokasi>_<cahaya>_<YYYYMMDD>_<fotografer>_<idobjek>_<ulangan>.jpg"};
+}
+function readmeOf(sum){
+  const c=S.project;
+  return `AI Image Dataset Collector — ekspor dataset
+Proyek    : ${c.name}
+Dibuat    : ${sum.generated_at} oleh ${sum.generated_by}
+Cakupan   : ${sum.scope}
+
+Jumlah
+- Total foto       : ${sum.total_photos}
+- Objek fisik unik : ${sum.unique_objects}
+${Object.entries(sum.per_category).map(([k,v])=>`- ${k.padEnd(17)}: ${v.photos} foto, ${v.objects} objek`).join("\n")}
+
+Konvensi nama berkas
+${sum.naming}
+Satu objek fisik = satu ID objek (4 digit). Ulangan dimulai dari 1 dan bertambah untuk setiap foto baru dari objek yang sama.
+
+Kategori  : ${(c.categories||[]).filter(x=>x.active!==false).map(x=>x.code).join(", ")}
+Cahaya    : ${lightsOf().map(l=>l.code+" ("+l.label+")").join(", ")}
+Fotografer: ${[...new Set(Object.keys(sum.per_photographer))].map(k=>k+(nameOfCode(k)?" ("+nameOfCode(k)+")":"")).join(", ")}
+
+Berkas
+- metadata.csv / metadata.json : satu baris per foto. category_confirmed = label final; category_predicted = saran AI awal.
+- dataset_summary.json         : ringkasan jumlah.
+${sum.split?`- splits.csv                   : penempatan setiap ID objek ke train/val/test.
+
+Pembagian data
+Per ID objek fisik (bukan per foto), stratifikasi per kategori, seed "${sum.split.seed}", rasio ${sum.split.ratios.train}/${sum.split.ratios.val}/${sum.split.ratios.test}.
+Semua foto dari satu objek berada di satu kelompok, sehingga tidak ada kebocoran antara data latih dan data uji.`:"Pembagian data: tidak disertakan pada ekspor ini."}
+`;
+}
+async function offerFile(filename,data){
+  try{
+    if(S.downloads){await S.downloads.save({filename,data});return true}
+    const blob=data instanceof Blob?data:new Blob([data]);const u=URL.createObjectURL(blob);const a=document.createElement("a");a.href=u;a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);return true;
+  }catch(e){if(e&&e.code==="declined")toast("Unduhan dibatalkan.");else toast("Unduhan gagal: "+errMsg(e),"bad");return false}
+}
+const slug=s=>String(s||"dataset").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||"dataset";
+async function ensureJSZip(){if(window.JSZip)return true;for(const src of ["vendor/jszip.min.js","https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"]){try{await loadScript(src);if(window.JSZip)return true}catch{}}return false}
+async function exportZip(){
+  if(!(await ensureJSZip()))return toast("Pustaka ZIP gagal dimuat. Periksa koneksi lalu coba lagi.","bad");
+  S.exporting=true;const {rows,sel,sp}=exportRows();
+  const setP=(n,t)=>{const el=$("#exportProgress");if(el)el.innerHTML=`<div class="stack" style="gap:6px"><div class="progress"><span style="width:${n}%"></span></div><span class="muted small">${esc(t)}</span></div>`};
+  try{
+    const zip=new JSZip(),root=zip.folder("dataset_export"),failed=[];let done=0;const queue=rows.slice();
+    await Promise.all(Array.from({length:4},async()=>{while(queue.length){const r=queue.shift();try{root.file(r.file_path,await S.store.blob(r.asset_id))}catch{failed.push(r.filename)}done++;setP(Math.round(done/rows.length*85),`Mengambil foto ${done} dari ${rows.length}…`)}}));
+    const ok=rows.filter(r=>!failed.includes(r.filename)),clean=ok.map(cleanRow);
+    root.file("metadata.csv",toCSV(clean,CSV_COLS));root.file("metadata.json",JSON.stringify(clean,null,2));
+    const sum=summaryOf(ok,sp);sum.missing_files=failed;root.file("dataset_summary.json",JSON.stringify(sum,null,2));
+    if(sp)root.file("splits.csv",toCSV(sel.groups.map(g=>({object_code:g.code,category:g.category,split:sp.get(g.id),photos:ok.filter(r=>r.group_id===g.id).length})),["object_code","category","split","photos"]));
+    root.file("README.txt",readmeOf(sum));
+    setP(92,"Menyusun ZIP…");
+    const blob=await zip.generateAsync({type:"blob",compression:"STORE"});
+    setP(100,failed.length?`${failed.length} foto gagal diambil dan tidak disertakan.`:`Siap: ${ok.length} foto.`);
+    await offerFile(`dataset_export_${slug(S.project.name)}_${ymd(new Date())}.zip`,blob);
+  }catch(e){toast("Ekspor gagal: "+errMsg(e),"bad");setP(0,"Ekspor gagal.")}
+  finally{S.exporting=false}
+}
+function exportMeta(kind){const {rows}=exportRows(),clean=rows.map(cleanRow);if(kind==="csv")offerFile(`metadata_${slug(S.project.name)}_${ymd(new Date())}.csv`,toCSV(clean,CSV_COLS));else offerFile(`metadata_${slug(S.project.name)}_${ymd(new Date())}.json`,JSON.stringify(clean,null,2))}
+
+/* ---------- settings ---------- */
+function subTabs(){return can("admin")?[["proyek","Proyek","folder"],["pengguna","Pengguna","users"],["ai","AI lokal","ai"],["akun","Akun saya","user"]]:[["akun","Akun saya","user"],["ai","AI lokal","ai"]]}
+function viewSettings(){
+  const tabs=subTabs();if(!S.sub||!tabs.some(t=>t[0]===S.sub))S.sub=tabs[0][0];
+  if(!S.project&&S.sub!=="akun"&&S.sub!=="pengguna")S.sub=can("admin")?"pengguna":"akun";
+  const body={proyek:settingsProject,pengguna:settingsUsers,ai:settingsAI,akun:settingsAccount}[S.sub]();
+  return pageHead("Pengaturan")+`<div class="subnav" role="group" aria-label="Bagian pengaturan">${tabs.map(([id,l,icn])=>`<button data-act="sub" data-v="${id}" aria-pressed="${S.sub===id}">${ICON[icn]}${l}</button>`).join("")}</div>${body}`;
+}
+function settingsProject(){
+  if(!S.project)return noProject();
+  const c=S.project;
+  return `<div class="grid2">
+    <section class="card"><h2>Informasi proyek</h2>
+      <label class="field">Nama proyek<input type="text" id="p-name" value="${esc(c.name)}"></label>
+      <label class="field">Deskripsi penelitian<textarea id="p-desc">${esc(c.description||"")}</textarea></label>
+      <div class="grid2" style="gap:10px"><label class="field">Target foto per kategori<input type="number" min="0" id="p-target" value="${esc(c.targetPerCategory)}"></label>
+      <label class="field">Status<select id="p-status">${["aktif","jeda","selesai"].map(s=>`<option ${c.status===s?"selected":""}>${s}</option>`).join("")}</select></label></div>
+      <p class="muted small">Perubahan tersimpan otomatis saat Anda keluar dari kolom.</p></section>
+    <section class="card"><h2>Gambar</h2>
+      <div class="grid2" style="gap:10px"><label class="field">Kualitas JPEG<select id="p-q">${[[0.8,"80%"],[0.85,"85%"],[0.9,"90% (disarankan)"],[0.95,"95%"]].map(([v,l])=>`<option value="${v}" ${+c.jpegQuality===v?"selected":""}>${l}</option>`).join("")}</select></label>
+      <label class="field">Sisi terpanjang<select id="p-dim">${[[1024,"1024 px"],[1600,"1600 px (disarankan)"],[2048,"2048 px"],[0,"Ukuran asli"]].map(([v,l])=>`<option value="${v}" ${+c.maxDim===v?"selected":""}>${l}</option>`).join("")}</select></label></div>
+      <p class="muted small">Foto 1600 px berukuran ±300–500 KB. Paket gratis Supabase (1 GB) cukup untuk ±2.000–3.000 foto.</p>
+      <hr class="sep"><h2>Kondisi cahaya</h2>
+      <div class="taglist">${lightsOf().map((l,ix)=>`<span class="tag"><code>${esc(l.code)}</code> ${esc(l.label)}${S.images.some(i=>i.lighting===l.code)||lightsOf().length<2?"":`<button data-act="rmLight" data-v="${ix}" aria-label="Hapus ${esc(l.code)}">×</button>`}</span>`).join("")}</div>
+      <div class="addrow"><input type="text" id="n-light-code" placeholder="kode, mis. low"><input type="text" id="n-light-label" placeholder="keterangan, mis. cahaya redup"><button class="btn" data-act="addLight">Tambah</button></div></section>
+  </div>
+  <section class="card"><div class="card-h"><h2>Kategori objek</h2><span class="muted small">Kode menjadi awalan nama berkas. Deskripsi membantu pengumpul.</span></div>
+    <div>${(c.categories||[]).map((k,ix)=>{const used=S.images.some(i=>i.category_confirmed===k.code);return `<div class="catrow ${clsOf(k.code)}" style="${clsStyle(k.code)}"><i></i><code class="mono">${esc(k.code)}</code><input class="cr-name" type="text" data-cat="${ix}" data-k="name" value="${esc(k.name)}" aria-label="Nama ${esc(k.code)}"><input class="cr-desc" type="text" data-cat="${ix}" data-k="desc" value="${esc(k.desc||"")}" aria-label="Deskripsi ${esc(k.code)}"><label class="row small" style="gap:5px"><input type="checkbox" data-catact="${ix}" ${k.active!==false?"checked":""}> aktif</label>${used?'<span class="muted small">dipakai</span>':`<button class="btn sm ghost" data-act="rmCat" data-v="${ix}" aria-label="Hapus ${esc(k.code)}">${ICON.x}</button>`}</div>`}).join("")}</div>
+    <div class="addrow"><label class="field">Kode baru<input type="text" id="n-cat-code" placeholder="mis. kaca"></label><label class="field">Nama tampilan<input type="text" id="n-cat-name" placeholder="mis. Kaca"></label><button class="btn" data-act="addCat">${ICON.plus} Tambah kategori</button></div>
+  </section>
+  <section class="card"><h2>Proyek lain</h2>
+    <form id="f-newproj" class="addrow" style="grid-template-columns:minmax(0,1fr) auto"><label class="field">Nama proyek baru<input type="text" id="np-name" placeholder="mis. Dataset Sampah Gedung B"></label><button class="btn" type="submit">${ICON.plus} Buat proyek</button></form>
+    <hr class="sep">
+    <div class="row"><button class="btn danger" data-act="askDelProject">Hapus proyek “${esc(c.name)}”</button></div><div id="delProject"></div>
+  </section>`;
+}
+function settingsUsers(){
+  const users=S.profiles,codes=users.map(u=>u.photographer_code);
+  const cred=S.newCred;
+  return `<div class="grid2" style="align-items:start">
+  <section class="card"><div class="card-h"><h2>Tambah pengguna</h2></div>
+    ${cred?`<div class="note ok stack" style="gap:10px"><b>Akun ${esc(cred.username)} dibuat</b><span>Bagikan info masuk ini ke pengguna. Kata sandi tidak bisa dilihat lagi setelah halaman ini ditutup.</span><div class="cred" id="cred-text">${esc(credText(cred))}</div><div class="row"><button class="btn sm primary" data-act="copyCred">${ICON.copy} Salin info masuk</button><button class="btn sm ghost" data-act="dismissCred">Selesai</button></div></div>`:""}
+    <form id="f-adduser" class="stack" autocomplete="off">
+      <label class="field">Nama lengkap<input type="text" id="nu-name" required placeholder="mis. Budi Santoso"></label>
+      <div class="grid2" style="gap:10px"><label class="field">Username<input type="text" id="nu-user" required autocapitalize="none" spellcheck="false" placeholder="mis. budi.santoso"></label>
+      <label class="field">Kode fotografer<input type="text" id="nu-code" required value="${esc(nextPhotographerCode(codes))}" style="text-transform:uppercase;font-family:var(--f-mono)"></label></div>
+      <div class="field"><span>Peran</span><div class="seg" role="group" id="nu-role">${["pengumpul","pemeriksa","admin"].map((r,i)=>`<button type="button" data-act="nuRole" data-v="${r}" aria-pressed="${(S.nuRole||"pengumpul")===r}">${ROLE_LABEL[r]}</button>`).join("")}</div><span class="hint">${esc(ROLE_DESC[S.nuRole||"pengumpul"])}</span></div>
+      <label class="field">Kata sandi awal<div class="row" style="flex-wrap:nowrap"><input type="text" id="nu-pass" required minlength="8" value="${esc(S.nuPass||genPassword())}" style="font-family:var(--f-mono)"><button class="btn" type="button" data-act="genPw" aria-label="Buat kata sandi acak">${ICON.redo}</button></div><span class="hint">Minimal 8 karakter. Pengguna bisa menggantinya sendiri di Akun saya.</span></label>
+      <button class="btn primary" type="submit" ${S.busy?"disabled":""}>${ICON.plus} Buat akun</button>
+    </form></section>
+  <section class="card"><div class="card-h"><h2>Pengguna</h2><span class="muted small">${users.filter(u=>u.active).length} aktif dari ${users.length}</span></div>
+    <div class="users">${users.map(userRow).join("")}</div></section></div>`;
+}
+function genPassword(){const a="abcdefghjkmnpqrstuvwxyz23456789";let s="";const r=new Uint32Array(10);crypto.getRandomValues(r);for(const x of r)s+=a[x%a.length];S.nuPass=s.slice(0,5)+"-"+s.slice(5);return S.nuPass}
+function credText(c){return `Dataset Collector\nAlamat  : ${location.origin+location.pathname}\nUsername: ${c.username}\nSandi   : ${c.password}\nPeran   : ${ROLE_LABEL[c.role]}`}
+function userRow(u){
+  const me=u.user_id===S.user.id,ed=S.editUser===u.user_id,pw=S.pwUser===u.user_id,del=S.delUser===u.user_id;
+  return `<div class="user ${u.active?"":"off"}"><span class="avatar">${esc(initials(u))}</span>
+    <div class="who"><b>${esc(u.full_name||u.username)}${me?' <span class="chip acc">Anda</span>':""}</b><span>@${esc(u.username)} · <span class="mono">${esc(u.photographer_code)}</span> · ${esc(ROLE_LABEL[u.role])}${u.active?"":" · nonaktif"}</span></div>
+    <div class="acts"><button class="btn sm" data-act="editUser" data-v="${esc(u.user_id)}">Ubah</button><button class="btn sm ghost" data-act="pwUser" data-v="${esc(u.user_id)}">${ICON.key} Sandi</button>${me?"":`<button class="btn sm ghost danger" data-act="delUser" data-v="${esc(u.user_id)}">Hapus</button>`}</div>
+    ${ed?`<div class="edit"><label class="field">Nama<input type="text" id="eu-name" value="${esc(u.full_name)}"></label><label class="field">Kode fotografer<input type="text" id="eu-code" value="${esc(u.photographer_code)}" style="text-transform:uppercase;font-family:var(--f-mono)"></label>
+      <label class="field">Peran<select id="eu-role" ${me?"disabled":""}>${["pengumpul","pemeriksa","admin"].map(r=>`<option value="${r}" ${u.role===r?"selected":""}>${ROLE_LABEL[r]}</option>`).join("")}</select></label>
+      <label class="field">Status<select id="eu-active" ${me?"disabled":""}><option value="1" ${u.active?"selected":""}>Aktif</option><option value="0" ${u.active?"":"selected"}>Nonaktif</option></select></label>
+      <div class="row" style="grid-column:1/-1"><button class="btn sm primary" data-act="saveUser" data-v="${esc(u.user_id)}">Simpan</button><button class="btn sm ghost" data-act="editUser" data-v="">Batal</button><span class="muted small">Mengganti kode fotografer tidak mengubah nama berkas foto lama.</span></div></div>`:""}
+    ${pw?`<div class="edit" style="grid-template-columns:minmax(0,1fr) auto"><label class="field">Kata sandi baru untuk ${esc(u.username)}<input type="text" id="pu-pass" minlength="8" value="${esc(genPassword())}" style="font-family:var(--f-mono)"></label><div class="row" style="align-self:end"><button class="btn sm primary" data-act="savePw" data-v="${esc(u.user_id)}">Atur sandi</button><button class="btn sm ghost" data-act="pwUser" data-v="">Batal</button></div></div>`:""}
+    ${del?`<div class="edit" style="grid-template-columns:1fr"><p class="note bad">Hapus akun <b>${esc(u.username)}</b>? Pengguna tidak bisa masuk lagi. Foto yang sudah diambilnya tetap tersimpan. Untuk menghentikan akses sementara, pilih Ubah → Nonaktif.</p><div class="row"><button class="btn sm danger solid" data-act="doDelUser" data-v="${esc(u.user_id)}">Ya, hapus akun</button><button class="btn sm ghost" data-act="delUser" data-v="">Batal</button></div></div>`:""}
+  </div>`;
+}
+function settingsAI(){if(!S.project)return `<p class="muted">Buat proyek terlebih dahulu.</p>`;return `<section class="card" id="ai-panel">${aiPanelHTML()}</section>`}
+function settingsAccount(){
+  const me=S.me;
+  return `<div class="grid2" style="align-items:start">
+  <section class="card"><div class="row" style="gap:14px"><span class="avatar" style="width:52px;height:52px;font-size:1.05rem">${esc(initials(me))}</span><div class="stack" style="gap:2px"><h2>${esc(me.full_name||me.username)}</h2><span class="muted small">@${esc(me.username)}</span></div></div>
+    <dl class="kv"><dt>Peran</dt><dd>${esc(ROLE_LABEL[S.role])} — ${esc(ROLE_DESC[S.role])}</dd><dt>Kode fotografer</dt><dd class="mono">${esc(me.photographer_code)}</dd><dt>Foto saya</dt><dd>${fmtInt(S.images.filter(i=>i.photographer_code===me.photographer_code).length)} di proyek ini</dd></dl>
+    <button class="btn danger" data-act="signOut" style="align-self:flex-start">${ICON.logout} Keluar</button></section>
+  <section class="card"><h2>Ganti kata sandi</h2>
+    <form id="f-mypw" class="stack">${pwField("my-pass","Kata sandi baru (minimal 8 karakter)","new-password")}${pwField("my-pass2","Ulangi kata sandi baru","new-password")}<button class="btn primary" type="submit" style="align-self:flex-start">Simpan kata sandi</button></form></section></div>`;
+}
+async function saveProject(patch){
+  if(!S.project)return;const next={...S.project,...patch};S.project=next;S.projects=S.projects.map(p=>p.id===S.pid?next:p);
+  try{await S.store.saveProject(S.pid,next)}catch(e){toast("Pengaturan gagal disimpan: "+errMsg(e),"bad")}
+}
+async function createProject(cfg){try{const pid=await S.store.createProject(cfg);ls.set("pid",pid);S.pid=null;toast("Proyek dibuat.","ok");if(S.route==="atur"){S.sub="proyek"}}catch(e){toast("Gagal membuat proyek: "+errMsg(e),"bad")}}
+async function deleteProject(){const pid=S.pid,box=$("#delProject");if(box)box.innerHTML=`<p class="note">Menghapus proyek dan fotonya…</p>`;try{await S.store.deleteProject(pid);clearProject();ls.set("pid",null);toast("Proyek dihapus.","ok");go("beranda")}catch(e){toast("Penghapusan berhenti: "+errMsg(e),"bad")}}
+async function addUser(){
+  const name=$("#nu-name").value.trim(),u=normUser($("#nu-user").value),code=codeToken($("#nu-code").value),pw=$("#nu-pass").value,role=S.nuRole||"pengumpul";
+  if(!USER_RE.test(u))return toast("Username 3–30 karakter: huruf kecil, angka, titik, garis bawah, atau strip.","bad");
+  if(!/^[A-Z0-9]{2,10}$/.test(code))return toast("Kode fotografer 2–10 huruf besar atau angka, misalnya FA02.","bad");
+  if(pw.length<8)return toast("Kata sandi minimal 8 karakter.","bad");
+  S.busy=true;
+  try{await S.store.createUser({username:u,password:pw,full_name:name,role,code});S.newCred={username:u,password:pw,role};S.nuPass=null;S.nuRole="pengumpul";toast(`Akun ${u} dibuat.`,"ok")}
+  catch(e){toast(errMsg(e),"bad")}
+  finally{S.busy=false;render()}
+}
+async function changeMyPassword(){
+  const a=$("#my-pass").value,b=$("#my-pass2").value;
+  if(a.length<8)return toast("Kata sandi minimal 8 karakter.","bad");if(a!==b)return toast("Kedua kata sandi tidak sama.","bad");
+  try{const {error}=await S.sb.auth.updateUser({password:a});if(error)throw error;toast("Kata sandi diperbarui.","ok");$("#my-pass").value="";$("#my-pass2").value=""}catch(e){toast(errMsg(e),"bad")}
+}
+
+/* ---------- events ---------- */
+document.addEventListener("click",async e=>{
+  const t=e.target.closest("[data-act]");if(!t)return;
+  const act=t.dataset.act,v=t.dataset.v;
+  switch(act){
+    case "togglePw":{S.showPw=!S.showPw;const vals={};document.querySelectorAll(".pw input").forEach(i=>{vals[i.id]=i.value});if(S.user&&!S.authView)render();else renderAuth();for(const [id,val] of Object.entries(vals)){const el=$("#"+id);if(el)el.value=val}break}
+    case "openAccount":S.sub="akun";if(location.hash==="#atur"){e.preventDefault();render()}break;
+    case "signOut":signOut();break;
+    case "light":S.session.lighting=v;ls.set("light:"+S.pid,v);document.querySelectorAll("#light-seg button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.v===v)));renderSavebar();break;
+    case "openCam":openCamera();break;
+    case "closeCam":stopCamera();break;
+    case "flip":S.cam.facing=S.cam.facing==="environment"?"user":"environment";openCamera();break;
+    case "snap":snap();break;
+    case "nativeCam":stopCamera();$("#fileCam").click();break;
+    case "pickLib":stopCamera(true);$("#fileLib").click();break;
+    case "again":{const last=S.lastSaved;S.draft=newDraft(last?last.group_id:null);S.lastSaved=null;renderCaptureParts();openCamera();break}
+    case "newObj":S.draft=newDraft("new");S.lastSaved=null;renderCaptureParts();openCamera();break;
+    case "cat":S.draft.category=v;renderCategory();renderSavebar();break;
+    case "runAI":runAI();break;
+    case "aiDownload":aiDownload();break;
+    case "aiLoad":aiLoad();break;
+    case "aiRemove":aiRemove();break;
+    case "aiBench":aiBenchmark();break;
+    case "gnew":S.draft.groupChoice="new";renderGroup();renderCategory();renderSavebar();if(S.draft.blob&&aiOn()&&S.draft.ai.status==="idle"&&aiReady())runAI();break;
+    case "gcont":{const q=$("#g-q");if(q){q.focus();q.scrollIntoView({block:"center",behavior:"smooth"})}else toast("Belum ada objek yang bisa difoto ulang. Pilih “Objek baru”.");break}
+    case "gpick":S.draft.groupChoice=v;S.draft.similar=null;renderGroup();renderCategory();renderSavebar();break;
+    case "copyName":{const n=t.dataset.name;if(!n)break;try{await navigator.clipboard.writeText(n);toast("Nama berkas disalin.")}catch{toast(n)}break}
+    case "save":saveDraft();break;
+    case "galFilter":try{S.gf={...S.gf,...JSON.parse(t.dataset.f)}}catch{}break;
+    case "gfreset":S.gf={q:"",cat:"",loc:"",ph:"",date:"",code:"",status:""};render();break;
+    case "galView":S.galView=v;ls.set("galView",v);render();break;
+    case "bulkVerify":{const n=filteredImages().filter(i=>i.verification_status!=="verified").length;$("#bulkConfirm").innerHTML=`<div class="note warn row" style="justify-content:space-between"><span>Tandai ${n} foto yang tampil sebagai terverifikasi?</span><span class="row"><button class="btn sm primary" data-act="bulkYes">Ya, verifikasi</button><button class="btn sm" data-act="bulkNo">Batal</button></span></div>`;break}
+    case "bulkYes":{const ids=filteredImages().filter(i=>i.verification_status!=="verified").map(i=>i.id);$("#bulkConfirm").innerHTML=`<p class="note">Memperbarui ${ids.length} foto…</p>`;await setStatus(ids,"verified");break}
+    case "bulkNo":$("#bulkConfirm").innerHTML="";break;
+    case "open":openDetail(v);break;
+    case "close":closeModal();break;
+    case "modalBg":if(e.target===t)closeModal();break;
+    case "nav":{const x=filteredImages()[+v];if(x)openDetail(x.id);break}
+    case "setStatus":await setStatus([S.modal.id],v);setTimeout(renderModal,200);break;
+    case "editCat":S.modal.editCat=!S.modal.editCat;S.modal.confirmDel=false;renderModal();break;
+    case "applyCat":{const i=S.images.find(x=>x.id===S.modal.id);if(i)changeGroupCategory(i.group_id,v);break}
+    case "askDel":S.modal.confirmDel=!S.modal.confirmDel;S.modal.editCat=false;renderModal();break;
+    case "doDel":{const id=S.modal.id,list=filteredImages(),ix=list.findIndex(x=>x.id===id),nx=list[ix+1]||list[ix-1];await deleteImage(id);if(nx)setTimeout(()=>openDetail(nx.id),200);else closeModal();break}
+    case "eo":if(t.disabled)break;S.exportOpts[t.dataset.k]=v;ls.set("exportOpts2",S.exportOpts);render();break;
+    case "exportZip":exportZip();break;
+    case "exportCsv":exportMeta("csv");break;
+    case "exportJson":exportMeta("json");break;
+    case "sub":S.sub=v;S.editUser=S.pwUser=S.delUser=null;render();break;
+    case "nuRole":S.nuRole=v;S.nuPass=$("#nu-pass")?.value||S.nuPass;{const keep={n:$("#nu-name")?.value,u:$("#nu-user")?.value,c:$("#nu-code")?.value};render();if($("#nu-name")){$("#nu-name").value=keep.n||"";$("#nu-user").value=keep.u||"";$("#nu-code").value=keep.c||""}}break;
+    case "genPw":{const el=$("#nu-pass");if(el)el.value=genPassword();break}
+    case "copyCred":{const txt=credText(S.newCred);try{await navigator.clipboard.writeText(txt);toast("Info masuk disalin. Kirim lewat WhatsApp atau pesan pribadi.","ok")}catch{const r=document.createRange();r.selectNodeContents($("#cred-text"));const sel=getSelection();sel.removeAllRanges();sel.addRange(r);toast("Teks sudah dipilih, salin dengan Ctrl+C atau tahan layar.")}break}
+    case "dismissCred":S.newCred=null;render();break;
+    case "editUser":S.editUser=v||null;S.pwUser=S.delUser=null;render();break;
+    case "pwUser":S.pwUser=v||null;S.editUser=S.delUser=null;render();break;
+    case "delUser":S.delUser=v||null;S.editUser=S.pwUser=null;render();break;
+    case "saveUser":{try{await S.store.updateUser(v,{full_name:$("#eu-name").value.trim(),code:codeToken($("#eu-code").value),role:$("#eu-role").value,active:$("#eu-active").value==="1"});S.editUser=null;toast("Pengguna diperbarui.","ok");render()}catch(err){toast(errMsg(err),"bad")}break}
+    case "savePw":{const pw=$("#pu-pass").value;if(pw.length<8)return toast("Kata sandi minimal 8 karakter.","bad");try{await S.store.setPassword(v,pw);const u=S.profiles.find(x=>x.user_id===v);S.pwUser=null;S.newCred={username:u.username,password:pw,role:u.role};S.sub="pengguna";toast("Kata sandi diatur ulang.","ok");render();window.scrollTo(0,0)}catch(err){toast(errMsg(err),"bad")}break}
+    case "doDelUser":{try{await S.store.deleteUser(v);S.delUser=null;toast("Akun dihapus.","ok");render()}catch(err){toast(errMsg(err),"bad")}break}
+    case "addCat":{const code=normLoc($("#n-cat-code").value),name=$("#n-cat-name").value.trim()||code;if(!code)return toast("Isi kode kategori (huruf kecil dan angka).","bad");if((S.project.categories||[]).some(c=>c.code===code))return toast("Kode kategori sudah ada.","bad");await saveProject({categories:[...(S.project.categories||[]),{code,name,desc:"",active:true}]});render();break}
+    case "rmCat":{const cats=S.project.categories.slice();cats.splice(+v,1);await saveProject({categories:cats});render();break}
+    case "addLight":{const code=normLoc($("#n-light-code").value);if(!code)return toast("Isi kode cahaya (huruf kecil dan angka).","bad");if(lightsOf().some(l=>l.code===code))return toast("Kode sudah ada.","bad");await saveProject({lightings:[...lightsOf(),{code,label:$("#n-light-label").value.trim()||code}]});render();break}
+    case "rmLight":{const a=lightsOf().slice();a.splice(+v,1);await saveProject({lightings:a});render();break}
+    case "askDelProject":$("#delProject").innerHTML=`<div class="note bad stack" style="gap:8px;margin-top:10px"><b>Hapus proyek “${esc(S.project.name)}”?</b><span>${S.images.length} foto, ${S.groups.length} objek, dan semua pengaturannya akan dihapus permanen. Unduh ZIP terlebih dahulu bila perlu.</span><div class="row"><button class="btn sm danger solid" data-act="doDelProject">Ya, hapus proyek</button><button class="btn sm" data-act="noDelProject">Batal</button></div></div>`;break;
+    case "noDelProject":$("#delProject").innerHTML="";break;
+    case "doDelProject":deleteProject();break;
+  }
+});
+document.addEventListener("change",async e=>{
+  const id=e.target.id,val=e.target.value;
+  if(id==="fileCam"||id==="fileLib"){const f=e.target.files&&e.target.files[0];e.target.value="";if(f){if(S.route!=="ambil")go("ambil");ingest(f,f.name)}return}
+  if(S.route==="ambil"){
+    if(id==="s-loc"){S.session.location=val;ls.set("loc:"+S.pid,val);renderSavebar()}
+    if(id==="s-date"){S.session.dateIso=val;renderSavebar()}
+  }
+  if(S.route==="galeri"){const map={"gf-cat":"cat","gf-loc":"loc","gf-ph":"ph","gf-date":"date","gf-status":"status"};if(map[id]){S.gf[map[id]]=val;render()}}
+  if(S.route==="ekspor"){
+    if(id==="eo-split"){S.exportOpts.split=e.target.checked;if(!e.target.checked)S.exportOpts.layout="flat"}
+    if(["eo-train","eo-val","eo-test"].includes(id))S.exportOpts[id.slice(3)]=Math.max(0,Math.min(100,+val||0));
+    if(id==="eo-seed")S.exportOpts.seed=val||"42";
+    ls.set("exportOpts2",S.exportOpts);render();
+  }
+  if(S.route==="atur"&&S.project&&can("admin")){
+    const pm={"p-name":["name",v=>v.trim()||"Proyek tanpa nama"],"p-desc":["description",v=>v],"p-status":["status",v=>v],"p-target":["targetPerCategory",v=>Math.max(0,+v||0)],"p-q":["jpegQuality",v=>+v],"p-dim":["maxDim",v=>+v],"p-ai":["aiMode",v=>v],"p-learn":["aiLearn",v=>v]};
+    if(pm[id]){await saveProject({[pm[id][0]]:pm[id][1](val)});if(id==="p-ai"){if(val!=="off"&&AI.cached&&!AI.session)aiLoad();render()}toast("Tersimpan.")}
+    if(e.target.dataset.cat!=null){const cats=S.project.categories.map(c=>({...c}));cats[+e.target.dataset.cat][e.target.dataset.k]=val;await saveProject({categories:cats});toast("Tersimpan.")}
+    if(e.target.dataset.catact!=null){const cats=S.project.categories.map(c=>({...c}));cats[+e.target.dataset.catact].active=e.target.checked;await saveProject({categories:cats});render()}
+  }
+});
+document.addEventListener("input",e=>{
+  const id=e.target.id;
+  if(id==="s-loc"){S.session.location=e.target.value;const h=$("#loc-hint");if(h)h.innerHTML=locHint();clearTimeout(S._lt);S._lt=setTimeout(()=>{ls.set("loc:"+S.pid,S.session.location);renderSavebar()},150)}
+  if(id==="d-note")S.draft.note=e.target.value;
+  if(id==="g-q"){S.gq=e.target.value;const pos=e.target.selectionStart;renderGroup();const q=$("#g-q");if(q){q.focus();try{q.setSelectionRange(pos,pos)}catch{}}}
+  if(id==="nu-name"){const u=$("#nu-user");if(u&&(!u.dataset.touched))u.value=usernameFrom(e.target.value)}
+  if(id==="nu-user")e.target.dataset.touched="1";
+  if(id==="gf-q"||id==="gf-code"){S.gf[id==="gf-q"?"q":"code"]=e.target.value;clearTimeout(S._gt);S._gt=setTimeout(()=>{const pos=e.target.selectionStart;render();const el=$("#"+id);if(el){el.focus();try{el.setSelectionRange(pos,pos)}catch{}}},250)}
+});
+document.addEventListener("keydown",e=>{
+  if(S.cam.open){if(e.key==="Escape")stopCamera();if((e.key===" "||e.key==="Enter")&&S.cam.state==="live"&&!e.target.closest("button")){e.preventDefault();snap()}return}
+  if(S.modal){if(e.key==="Escape")closeModal();if(e.key==="ArrowRight"||e.key==="ArrowLeft"){const list=filteredImages(),ix=list.findIndex(x=>x.id===S.modal.id),nx=list[ix+(e.key==="ArrowRight"?1:-1)];if(nx)openDetail(nx.id)}}
+});
+document.addEventListener("paste",e=>{if(S.route!=="ambil")return;const it=[...(e.clipboardData?.items||[])].find(x=>x.type.startsWith("image/"));if(it){const f=it.getAsFile();if(f)ingest(f,"tempel")}});
+
+boot();
+
+</script>
+</body>
+</html>
