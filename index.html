@@ -1588,7 +1588,7 @@ function filteredImages(){
 }
 function statusMatch(i,st){
   if(st==="pending")return i.verification_status!=="verified";
-  if(st==="rf_wait")return i.verification_status==="verified"&&!["done","duplicate"].includes(i.roboflow_status);
+  if(st==="rf_wait")return i.verification_status==="verified"&&!["done","duplicate","uploaded"].includes(i.roboflow_status);
   if(st==="rf_error")return i.roboflow_status==="error";
   return i.verification_status===st;
 }
@@ -1619,7 +1619,8 @@ function viewGallery(){
 }
 function rfChip(i,short){
   const s=i.roboflow_status;if(!s)return "";
-  if(s==="done"||s==="duplicate")return `<span class="chip rf" title="${s==="duplicate"?"Sudah ada di Roboflow":"Terkirim ke Roboflow"}">${short?"RF":"Roboflow ✓"}</span>`;
+  if(s==="done"||s==="duplicate")return `<span class="chip rf" title="${s==="duplicate"?"Sudah ada di Roboflow":"Masuk Dataset Roboflow"}">${short?"RF":"Roboflow ✓"}</span>`;
+  if(s==="uploaded")return `<span class="chip warn" title="${esc(i.roboflow_error||"Terunggah tanpa label")}">${short?"RF?":"Roboflow, belum dilabel"}</span>`;
   if(s==="error")return `<span class="chip bad" title="${esc(i.roboflow_error||"")}">${short?"RF!":"Roboflow gagal"}</span>`;
   return "";
 }
@@ -1653,9 +1654,9 @@ function renderModal(){
         ${i.verification_status!=="verified"?`<button class="btn sm primary" data-act="setStatus" data-v="verified">${ICON.check} Verifikasi</button>`:`<button class="btn sm" data-act="setStatus" data-v="pending">Batalkan verifikasi</button>`}
         ${i.verification_status!=="flagged"?`<button class="btn sm" data-act="setStatus" data-v="flagged">Tandai perlu dicek</button>`:""}
         <button class="btn sm" data-act="editCat">Koreksi kategori</button>${can("admin")?`<button class="btn sm danger" data-act="askDel">Hapus</button>`:""}</div>`:""}
-      ${rfEnabled()&&i.verification_status==="verified"?`<div class="note ${i.roboflow_status==="error"?"bad":i.roboflow_status?"ok":""} row" style="justify-content:space-between;gap:8px;font-size:.84rem">
-        <span>${i.roboflow_status==="done"?`Terkirim ke Roboflow · ${esc(fmtDate(i.roboflow_at))}`:i.roboflow_status==="duplicate"?"Sudah ada di Roboflow (foto identik)":i.roboflow_status==="error"?`Gagal dikirim ke Roboflow: ${esc(i.roboflow_error||"")}`:"Belum terkirim ke Roboflow."}</span>
-        ${i.roboflow_status==="done"||i.roboflow_status==="duplicate"?"":`<button class="btn sm" data-act="rfOne" ${S.rfBusy?"disabled":""}>${S.rfBusy?'<span class="spin" style="width:12px;height:12px"></span> Mengirim…':"Kirim ke Roboflow"}</button>`}</div>`:""}
+      ${rfEnabled()&&i.verification_status==="verified"?`<div class="note ${i.roboflow_status==="error"?"bad":i.roboflow_status==="uploaded"?"warn":i.roboflow_status?"ok":""} row" style="justify-content:space-between;gap:8px;font-size:.84rem">
+        <span>${i.roboflow_status==="done"?`Masuk Dataset Roboflow dengan label <b>${esc(i.category_confirmed)}</b> · ${esc(fmtDate(i.roboflow_at))}`:i.roboflow_status==="duplicate"?"Sudah ada di Roboflow (foto identik)":i.roboflow_status==="uploaded"?`Terunggah ke Roboflow tetapi belum masuk Dataset. ${esc(i.roboflow_error||"")}`:i.roboflow_status==="error"?`Gagal dikirim ke Roboflow: ${esc(i.roboflow_error||"")}`:"Belum terkirim ke Roboflow."}</span>
+        ${["done","duplicate","uploaded"].includes(i.roboflow_status)?"":`<button class="btn sm" data-act="rfOne" ${S.rfBusy?"disabled":""}>${S.rfBusy?'<span class="spin" style="width:12px;height:12px"></span> Mengirim…':"Kirim ke Roboflow"}</button>`}</div>`:""}
       ${m.editCat&&g?`<div class="note stack" style="gap:8px"><b>Ubah kategori objek ${esc(g.code)}</b><span>Semua ${sibs.length} foto objek ini berganti kategori dan nama berkasnya disusun ulang. Saran AI awal tetap tersimpan.</span>
         <div class="clsgrid">${cats.map(c=>`<button class="clsbtn ${clsOf(c.code)}" style="${clsStyle(c.code)}min-height:46px" data-act="applyCat" data-v="${esc(c.code)}" aria-pressed="${g.category===c.code}"><b><i></i>${esc(c.name)}</b></button>`).join("")}</div><button class="btn sm ghost" data-act="editCat" style="align-self:flex-start">Batal</button></div>`:""}
       ${m.confirmDel?`<div class="note bad stack" style="gap:8px"><b>Hapus foto ini permanen?</b><span>Berkas dan metadatanya dihapus. Nomor ulangan ${i.repetition_number} tidak dipakai ulang.</span><div class="row"><button class="btn sm danger solid" data-act="doDel">Ya, hapus</button><button class="btn sm" data-act="askDel">Batal</button></div></div>`:""}
@@ -1673,12 +1674,13 @@ function rfEnabled(){const r=S.project&&S.project.roboflow;return !!(r&&r.enable
 async function syncRoboflow(ids){
   if(!rfEnabled()||!S.store)return;
   if(S.rfBusy){S.rfQueue=[...(S.rfQueue||[]),...(ids||[])];return}
-  const pid=S.pid;let sent=0,dup=0,failed=0,err=null,lastFail=null;S.rfBusy=true;rfRefreshUI();
+  const pid=S.pid;let sent=0,dup=0,failed=0,unl=0,unlNote=null,err=null,lastFail=null;S.rfBusy=true;rfRefreshUI();
   try{
     const batches=[];if(ids)for(let i=0;i<ids.length;i+=20)batches.push(ids.slice(i,i+20));
     for(let round=0;round<(ids?batches.length:50);round++){
       const r=await S.store.roboflowSync(pid,ids?batches[round]:null);
-      sent+=r.sent||0;dup+=r.duplicate||0;failed+=r.failed||0;
+      sent+=r.sent||0;dup+=r.duplicate||0;failed+=r.failed||0;unl+=r.unlabeled||0;
+      const u=(r.results||[]).find(x=>x.status==="uploaded"&&x.note);if(u)unlNote=u.note;
       const f=(r.results||[]).find(x=>x.status==="error");if(f)lastFail=f.error;
       if(!ids&&!(r.remaining>0))break;
       if(!ids&&!(r.results||[]).some(x=>x.status!=="error"))break;
@@ -1687,7 +1689,8 @@ async function syncRoboflow(ids){
   S.rfBusy=false;S.store.refresh("images",pid);
   if(err)toast("Roboflow: "+err,"bad");
   else if(failed)toast(`Roboflow: ${sent} terkirim, ${failed} gagal. ${lastFail||""}`,"bad");
-  else if(sent||dup)toast(`Terkirim ke Roboflow: ${sent} foto${dup?`, ${dup} sudah ada`:""}.`,"ok");
+  else if(unl&&!sent)toast(`Terunggah ke Roboflow: ${unl} foto, belum masuk Dataset. ${unlNote||""}`,"bad");
+  else if(sent||dup||unl)toast(`Masuk Dataset Roboflow: ${sent} foto${dup?`, ${dup} sudah ada`:""}${unl?`, ${unl} belum dilabel`:""}.`,"ok");
   else if(!ids)toast("Tidak ada foto terverifikasi yang perlu dikirim.");
   const q=S.rfQueue;S.rfQueue=null;if(q&&q.length)syncRoboflow(q);else rfRefreshUI();
 }
@@ -1863,17 +1866,17 @@ function membersCard(){
 function rfCard(){
   if(!S.project)return "";
   const r=S.project.roboflow||{},k=S.rfKey[S.pid];
-  const waiting=S.images.filter(i=>i.verification_status==="verified"&&!["done","duplicate"].includes(i.roboflow_status)).length;
-  const done=S.images.filter(i=>["done","duplicate"].includes(i.roboflow_status)).length,errs=S.images.filter(i=>i.roboflow_status==="error").length;
+  const waiting=S.images.filter(i=>i.verification_status==="verified"&&!["done","duplicate","uploaded"].includes(i.roboflow_status)).length;
+  const done=S.images.filter(i=>["done","duplicate"].includes(i.roboflow_status)).length,errs=S.images.filter(i=>i.roboflow_status==="error").length,unl=S.images.filter(i=>i.roboflow_status==="uploaded").length;
   return `<section class="card" id="rf-card"><div class="card-h"><h2>Kirim ke Roboflow</h2>${r.enabled&&r.project?'<span class="chip ok">Aktif</span>':'<span class="chip">Mati</span>'}</div>
-    <p class="muted small">Saat anggota menekan <b>Verifikasi</b>, foto (yang sudah dipotong) dan nama berkasnya otomatis diunggah ke proyek Roboflow tim.</p>
+    <p class="muted small">Saat anggota menekan <b>Verifikasi</b>, foto (yang sudah dipotong) dan nama berkasnya otomatis diunggah ke proyek Roboflow tim. Pada proyek <b>klasifikasi</b>, kategori final ikut dipasang sebagai label, jadi foto langsung masuk <b>Dataset</b>.</p>
     <label class="row small" style="font-weight:650"><input type="checkbox" id="rf-enabled" ${r.enabled?"checked":""}> Kirim otomatis setelah verifikasi</label>
     <label class="field">Proyek Roboflow<input type="text" id="rf-project" value="${esc(r.project||"")}" placeholder="mis. sampah-kampus" autocapitalize="none" spellcheck="false"><span class="hint">Slug proyek, atau tempel tautan proyek dari app.roboflow.com.</span></label>
     <div class="grid2" style="gap:10px"><label class="field">Split<select id="rf-split">${[["auto","Per objek 70/20/10"],["train","Semua ke train"],["valid","Semua ke valid"],["test","Semua ke test"]].map(([v,l])=>`<option value="${v}" ${(r.split||"auto")===v?"selected":""}>${l}</option>`).join("")}</select></label>
       <label class="field">Nama batch<input type="text" id="rf-batch" value="${esc(r.batch||"")}" placeholder="mis. dataset-collector"></label></div>
     <label class="field">Private API Key<div class="row" style="flex-wrap:nowrap"><input type="password" id="rf-key" autocomplete="off" placeholder="${k===true?"tersimpan — isi untuk mengganti":"tempel Private API Key"}"><button class="btn" type="button" data-act="rfSaveKey">Simpan kunci</button></div>
       <span class="hint">${k===true?'<b style="color:var(--ok)">Kunci tersimpan di server.</b> ':k===false?'<b style="color:var(--bad)">Belum ada kunci.</b> ':""}Ambil di Roboflow → Settings → API Keys. Kunci disimpan di Supabase dan tidak pernah dikirim ke browser anggota.</span></label>
-    <div class="row"><button class="btn" data-act="rfAll" ${waiting&&r.enabled&&r.project&&!S.rfBusy?"":"disabled"}>${S.rfBusy?'<span class="spin" style="width:13px;height:13px"></span> Mengirim…':`Kirim ${fmtInt(waiting)} foto terverifikasi yang belum terkirim`}</button><span class="muted small">${fmtInt(done)} foto sudah di Roboflow${errs?` · <span style="color:var(--bad)">${errs} gagal</span>`:""}</span></div>
+    <div class="row"><button class="btn" data-act="rfAll" ${waiting&&r.enabled&&r.project&&!S.rfBusy?"":"disabled"}>${S.rfBusy?'<span class="spin" style="width:13px;height:13px"></span> Mengirim…':`Kirim ${fmtInt(waiting)} foto terverifikasi yang belum terkirim`}</button><span class="muted small">${fmtInt(done)} foto sudah di Dataset Roboflow${unl?` · <span style="color:var(--warn)">${unl} belum dilabel</span>`:""}${errs?` · <span style="color:var(--bad)">${errs} gagal</span>`:""}</span></div>
     <p class="note" style="font-size:.8rem">Membutuhkan Edge Function <span class="mono">roboflow-sync</span> di Supabase (dipasang sekali, lihat README). Split otomatis menaruh semua foto dari satu ID objek di split yang sama. Membatalkan verifikasi tidak menghapus foto dari Roboflow.</p></section>`;
 }
 function rfSlug(s){const t=String(s||"").trim().replace(/^https?:\/\/[^/]+\//,"").replace(/[?#].*$/,"");const p=t.split("/").filter(Boolean);const sl=p.length>=2?p[1]:p[0]||"";return /^[a-z0-9][a-z0-9._-]*$/i.test(sl)?sl.toLowerCase():""}

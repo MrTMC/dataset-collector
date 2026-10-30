@@ -1,5 +1,6 @@
 // Edge Function: roboflow-sync
-// Mengirim foto yang sudah diverifikasi ke proyek Roboflow tim, lalu mencatat statusnya di tabel images.
+// Mengirim foto yang sudah diverifikasi ke proyek Roboflow tim, memberi label kelasnya (proyek klasifikasi →
+// langsung masuk Dataset), lalu mencatat statusnya di tabel images.
 //
 // Dipanggil aplikasi setelah tombol Verifikasi ditekan:
 //   POST /functions/v1/roboflow-sync   { "project_id": "<uuid>", "image_ids": ["..."] }
@@ -58,6 +59,53 @@ export function splitFor(mode: string, projectId: string, groupId: string, ratio
   const x = (fnv(projectId + ":" + groupId) % 10000) / 10000 * tot;
   return x < ratio.train ? "train" : x < ratio.train + ratio.valid ? "valid" : "test";
 }
+// Workspace pemilik kunci API (Roboflow mengembalikan {"workspace": "<url>"} dari POST /?api_key=).
+async function keyWorkspace(f: Fetch, apiKey: string): Promise<string> {
+  for (const method of ["POST", "GET"]) {
+    try {
+      const r = await f(`${RF_API}/?api_key=${encodeURIComponent(apiKey)}`, { method });
+      const j: any = await r.json().catch(() => ({}));
+      const ws = typeof j.workspace === "string" ? j.workspace : j.workspace && (j.workspace.url || j.workspace.id);
+      if (r.ok && ws) return String(ws);
+    } catch { /* coba metode lain */ }
+  }
+  return "";
+}
+// Tipe proyek Roboflow: "classification", "object-detection", … ("" bila tidak diketahui)
+export async function projectType(f: Fetch, apiKey: string, slug: string): Promise<string> {
+  try {
+    const ws = await keyWorkspace(f, apiKey);if (!ws) return "";
+    const r = await f(`${RF_API}/${encodeURIComponent(ws)}/${encodeURIComponent(slug)}?api_key=${encodeURIComponent(apiKey)}`);
+    const j: any = await r.json().catch(() => ({}));
+    return String((j.project && j.project.type) || "");
+  } catch { return ""; }
+}
+// Proyek klasifikasi: beri label kelas → foto langsung masuk Dataset (bukan antrean Annotate).
+export async function labelClassification(f: Fetch, apiKey: string, slug: string, imageId: string, label: string): Promise<string | null> {
+  const qs = new URLSearchParams({ api_key: apiKey, name: label, addToDataset: "true" });
+  const r = await f(`${RF_API}/dataset/${slug}/annotate/${encodeURIComponent(imageId)}?${qs}`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ annotationFile: label, labelmap: null }),
+  });
+  const j: any = await r.json().catch(() => ({}));
+  const msg = String((j.error && (j.error.message || j.error)) || j.message || "");
+  if (r.status === 409 && /already annotated/i.test(msg)) return null;
+  if (!r.ok || j.error || j.success === false) return msg || ("HTTP " + r.status);
+  return null;
+}
+// Jelaskan kegagalan "does not exist / missing permissions": kunci milik workspace mana, proyek apa saja yang ada di sana.
+export async function diagnoseRoboflow(f: Fetch, apiKey: string, slug: string): Promise<string> {
+  try {
+    const ws = await keyWorkspace(f, apiKey);
+    if (!ws) return "Kunci API ditolak Roboflow. Pastikan yang ditempel adalah Private API Key (bukan Publishable key yang diawali rf_).";
+    const w = await f(`${RF_API}/${encodeURIComponent(ws)}?api_key=${encodeURIComponent(apiKey)}`);
+    const wj: any = await w.json().catch(() => ({}));
+    const ps: string[] = ((wj.workspace && wj.workspace.projects) || []).map((p: any) => String(p.id || "").split("/").pop()).filter(Boolean);
+    if (ps.includes(slug)) return `Proyek "${slug}" ada di workspace "${ws}", tetapi kunci ini tidak boleh mengunggah ke sana. Periksa peran akun di workspace tersebut.`;
+    return `Proyek "${slug}" tidak ditemukan di workspace "${ws}" (workspace pemilik kunci API ini). ` +
+      (ps.length ? `Proyek yang ada: ${ps.slice(0, 12).join(", ")}. ` : "Workspace ini belum punya proyek. ") +
+      "Isi nama proyek persis seperti di alamat app.roboflow.com/<workspace>/<proyek>, dan ambil Private API Key saat workspace tim yang dipilih.";
+  } catch { return ""; }
+}
 const inList = (ids: string[]) => "(" + ids.map(i => '"' + String(i).replace(/["\\]/g, "") + '"').join(",") + ")";
 
 export async function handle(req: Request, env: Env, f: Fetch = fetch): Promise<Response> {
@@ -98,10 +146,12 @@ export async function handle(req: Request, env: Env, f: Fetch = fetch): Promise<
   const ir = await f(q, { headers: asUser });
   if (!ir.ok) return json({ error: "Gagal membaca foto: " + (await ir.text()).slice(0, 200) }, 502);
   const all = (await ir.json()) as any[];
-  const todo = all.filter(r => r.roboflow_status !== "done" && r.roboflow_status !== "duplicate");
+  const todo = all.filter(r => !["done", "duplicate", "uploaded"].includes(r.roboflow_status));
   const batch = todo.slice(0, MAX_PER_CALL);
 
   const results: any[] = [];
+  let diag: string | null = null;
+  let ptype: string | null = null; // dicari sekali per panggilan
   const patch = (id: string, fields: Record<string, unknown>) =>
     f(`${rest}/images?project_id=eq.${pid}&id=eq.${encodeURIComponent(id)}`, {
       method: "PATCH", headers: { ...svc, "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify(fields),
@@ -128,12 +178,25 @@ export async function handle(req: Request, env: Env, f: Fetch = fetch): Promise<
       const txt = await up.text();
       let out: any = {}; try { out = JSON.parse(txt); } catch { /* bukan JSON */ }
       if (!up.ok || out.success === false || out.error) {
-        const m = (out.error && (out.error.message || out.error)) || out.message || txt || ("HTTP " + up.status);
-        throw new Error("Roboflow: " + String(m).slice(0, 240));
+        const m = String((out.error && (out.error.message || out.error)) || out.message || txt || ("HTTP " + up.status));
+        if (/does not exist|missing permission|unsupported request|unauthori|forbidden/i.test(m) || up.status === 401 || up.status === 403 || up.status === 404) {
+          if (diag === null) diag = await diagnoseRoboflow(f, apiKey, slug);
+          if (diag) throw new Error(diag);
+        }
+        throw new Error("Roboflow: " + m.slice(0, 240));
       }
-      const status = out.duplicate ? "duplicate" : "done";
-      await patch(r.id, { roboflow_status: status, roboflow_id: out.id ? String(out.id) : null, roboflow_error: null, roboflow_at: at });
-      results.push({ id: r.id, filename: r.filename, status, split, roboflow_id: out.id || null });
+      // Beri label agar foto langsung masuk Dataset (proyek klasifikasi). Proyek deteksi objek butuh kotak anotasi,
+      // jadi fotonya tetap di antrean Annotate Roboflow.
+      let status = out.duplicate ? "duplicate" : "done", note: string | null = null;
+      if (rf.label !== false && cat && out.id) {
+        if (ptype === null) ptype = await projectType(f, apiKey, slug);
+        if (!ptype || ptype === "classification") {
+          const err = await labelClassification(f, apiKey, slug, String(out.id), cat);
+          if (err) { status = "uploaded"; note = (ptype ? "" : "Tipe proyek tidak terbaca. ") + "Terunggah, tetapi label gagal dipasang: " + err.slice(0, 200); }
+        } else { status = "uploaded"; note = `Proyek Roboflow bertipe ${ptype}: foto masuk antrean Annotate dan perlu diberi kotak anotasi di Roboflow.`; }
+      } else if (!out.duplicate) { status = "uploaded"; }
+      await patch(r.id, { roboflow_status: status, roboflow_id: out.id ? String(out.id) : null, roboflow_error: note, roboflow_at: at });
+      results.push({ id: r.id, filename: r.filename, status, split, roboflow_id: out.id || null, note });
     } catch (e) {
       const msg = String((e as Error).message || e).replace(apiKey, "***").slice(0, 300);
       await patch(r.id, { roboflow_status: "error", roboflow_error: msg, roboflow_at: at }).catch(() => {});
@@ -142,6 +205,7 @@ export async function handle(req: Request, env: Env, f: Fetch = fetch): Promise<
   }
   return json({
     sent: results.filter(x => x.status === "done").length,
+    unlabeled: results.filter(x => x.status === "uploaded").length,
     duplicate: results.filter(x => x.status === "duplicate").length,
     failed: results.filter(x => x.status === "error").length,
     remaining: todo.length - batch.length,
