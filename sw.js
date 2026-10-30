@@ -1,7 +1,7 @@
 /* Service worker for the offline package of AI Image Dataset Collector.
    App shell is cached on install. The AI model and ONNX runtime (.wasm) are NOT cached here:
    the app downloads them on first use and keeps them in IndexedDB, so they are stored only once. */
-const SHELL = "adc-shell-v4";
+const SHELL = "adc-shell-v5";
 const FILES = ["./", "index.html", "config.js", "manifest.webmanifest", "icon.svg", "vendor/jszip.min.js", "vendor/supabase.js", "ort/ort.wasm.bundle.min.mjs", "models/waste5-v1.json"];
 
 self.addEventListener("install", e => {

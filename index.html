@@ -190,7 +190,45 @@ table.t tr.click:hover td{background:var(--surface-2)}
 .whoami .code{font-family:var(--f-mono);font-weight:700;font-size:1rem;color:var(--accent)}
 .stage{position:relative;aspect-ratio:4/3;width:100%;max-width:100%;border-radius:14px;background:var(--surface-2);border:2px dashed var(--line);overflow:hidden;display:grid;place-items:center}
 .stage.has{border:0;background:#0A0F0D}
-.stage img.shot{width:100%;height:100%;object-fit:contain}
+/* full photo + crop box: wrapper keeps the photo's own aspect ratio, so nothing is cut off */
+.cropwrap{display:flex;justify-content:center;align-items:center;background:#0A0F0D;border-radius:14px;padding:10px;min-height:160px}
+.cropper{position:relative;max-width:100%;overflow:hidden;border-radius:6px;user-select:none;-webkit-user-select:none;touch-action:none;background:#000}
+.cropper img{display:block;width:100%;height:100%;object-fit:contain;pointer-events:none;-webkit-user-drag:none}
+.cbox{position:absolute;box-shadow:0 0 0 200vmax rgba(0,0,0,.55);outline:2px solid #fff;outline-offset:-1px;cursor:move;touch-action:none;transition:left .25s,top .25s,width .25s,height .25s}
+.cropper.dragging .cbox{transition:none}
+.cbox::before,.cbox::after{content:"";position:absolute;inset:33.33% 0;border-block:1px solid rgba(255,255,255,.35);pointer-events:none}
+.cbox::after{inset:0 33.33%;border-block:0;border-inline:1px solid rgba(255,255,255,.35)}
+.cropper.full .cbox{box-shadow:none;outline-style:dashed;outline-color:rgba(255,255,255,.7)}
+.cropper.full .cbox::before,.cropper.full .cbox::after{display:none}
+.cbox .h{position:absolute;width:30px;height:30px;touch-action:none;z-index:1}
+.cbox .h::after{content:"";position:absolute;width:16px;height:16px;border:4px solid #fff;border-radius:2px;filter:drop-shadow(0 0 2px rgba(0,0,0,.6))}
+.cbox .h.nw{left:-8px;top:-8px;cursor:nwse-resize}.cbox .h.nw::after{left:5px;top:5px;border-right:0;border-bottom:0}
+.cbox .h.ne{right:-8px;top:-8px;cursor:nesw-resize}.cbox .h.ne::after{right:5px;top:5px;border-left:0;border-bottom:0}
+.cbox .h.sw{left:-8px;bottom:-8px;cursor:nesw-resize}.cbox .h.sw::after{left:5px;bottom:5px;border-right:0;border-top:0}
+.cbox .h.se{right:-8px;bottom:-8px;cursor:nwse-resize}.cbox .h.se::after{right:5px;bottom:5px;border-left:0;border-top:0}
+.cropper.busy .cbox{opacity:0}
+.cscan{position:absolute;inset:0;display:grid;place-items:center;background:linear-gradient(180deg,transparent,rgba(76,195,163,.18),transparent);background-size:100% 40%;background-repeat:no-repeat;animation:scan 1.3s ease-in-out infinite}
+@keyframes scan{0%{background-position:0 -40%}100%{background-position:0 140%}}
+.cropbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.manualid{display:grid;grid-template-columns:minmax(0,1fr) 120px;gap:12px;align-items:center;padding:11px 13px;border:1.5px dashed var(--line);border-radius:13px;cursor:text}
+.manualid span{display:flex;flex-direction:column;gap:2px;min-width:0}
+.manualid b{font-size:.9rem}
+.manualid small{font-size:.76rem;color:var(--muted);line-height:1.35}
+.manualid small.bad{color:var(--bad)}
+.manualid input{font-family:var(--f-mono);font-size:1.05rem;font-weight:700;text-align:center;letter-spacing:.08em}
+.manualid.on{border-style:solid;border-color:var(--accent);background:var(--accent-soft)}
+.checks{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow:auto;padding:1px}
+.checks.compact{flex-direction:row;flex-wrap:wrap;max-height:none}
+.check{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:11px;cursor:pointer;min-width:0}
+.check:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+.check.off{opacity:.6}
+.check input{width:18px;height:18px;accent-color:var(--accent);flex:none}
+.check .who{display:flex;flex-direction:column;min-width:0;line-height:1.3}
+.check .who b{font-size:.88rem}.check .who span{font-size:.76rem;color:var(--muted)}
+.checks.compact .check{padding:6px 10px;font-size:.86rem;font-weight:600}
+.avatar.sm{width:30px;height:30px;font-size:.72rem}
+.user .who .projs{font-size:.76rem;color:var(--muted)}
+.chip.rf{background:#6D28D9;color:#fff}
 .stage .empty{display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;padding:22px}
 .stage .bigcam{width:76px;height:76px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;border:0;cursor:pointer;box-shadow:0 6px 18px color-mix(in srgb,var(--accent) 40%,transparent)}
 .stage .bigcam svg{width:34px;height:34px}
@@ -267,9 +305,9 @@ table.t tr.click:hover td{background:var(--surface-2)}
 .tile{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--surface);cursor:pointer;text-align:left;padding:0;box-shadow:var(--shadow-sm)}
 .tile:hover{box-shadow:var(--shadow)}
 .tile .th{aspect-ratio:4/3;background:var(--surface-2);position:relative;width:100%}
-.tile .th img{width:100%;height:100%;object-fit:cover;display:block}
+.tile .th img{width:100%;height:100%;object-fit:contain;display:block}
 .tile .th .chip{position:absolute;left:7px;top:7px;background:rgba(0,0,0,.6);color:#fff}
-.tile .th .st{position:absolute;right:7px;top:7px}
+.tile .th .st{position:absolute;right:7px;top:7px;display:flex;gap:4px}
 .tile .meta{padding:9px 10px;display:flex;flex-direction:column;gap:3px;border-top:3px solid var(--c)}
 .tile .meta code{font-family:var(--f-mono);font-size:.64rem;word-break:break-all;color:var(--muted);line-height:1.4}
 .empty-state{display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;padding:44px 18px;border:2px dashed var(--line);border-radius:var(--r);color:var(--muted)}
@@ -510,9 +548,10 @@ function errMsg(e){const m=(e&&(e.message||e.error_description||e.code))||String
 function clsOf(code){return ["organik","kertas","plastik","logam","residu"].includes(code)?"cls-"+code:""}
 function clsStyle(code){if(clsOf(code))return "";const hues=[18,190,280,330,48,150];return `--c:hsl(${hues[strHash(code||"x")%hues.length]} 55% 45%);`}
 function initials(p){const n=(p&&(p.full_name||p.username))||"?";return n.split(/[\s._-]+/).filter(Boolean).slice(0,2).map(x=>x[0]).join("")}
-const ROLE_LABEL={admin:"Admin",pemeriksa:"Pemeriksa",pengumpul:"Pengumpul"};
-const ROLE_DESC={admin:"Mengatur proyek dan pengguna, plus semua hak pemeriksa.",pemeriksa:"Memverifikasi, mengoreksi label, dan menghapus foto.",pengumpul:"Mengambil dan menyimpan foto."};
-const can=min=>({admin:3,pemeriksa:2,pengumpul:1}[S.role]||0)>=({admin:3,pemeriksa:2,pengumpul:1}[min]);
+const ROLE_LABEL={admin:"Admin",anggota:"Anggota"};
+const ROLE_DESC={admin:"Membuka semua proyek, mengatur proyek, menambah anggota, dan menghapus foto.",anggota:"Mengambil foto dan memverifikasi foto di proyek yang diberikan admin."};
+const ROLE_RANK={admin:2,anggota:1};
+const can=min=>(ROLE_RANK[S.role]||0)>=(ROLE_RANK[min]||9);
 const ic=(d,extra="")=>`<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" ${extra}>${d}</svg>`;
 const ICON={
   logo:ic('<path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3.2"/>'),
@@ -570,14 +609,14 @@ const aiKey=f=>AI_CFG.version+"|"+f;
 const mb=n=>(n/1048576).toFixed(n>=10485760?0:1).replace(".",",")+" MB";
 function aiOn(){return !!(S.project&&S.project.aiMode!=="off")}
 function aiReady(){return AI.state==="ready"&&aiOn()}
-function aiRefreshUI(){if(S.route==="ambil")renderCategory();else if(S.route==="atur"){const el=$("#ai-panel");if(el){el.innerHTML=aiPanelHTML();showStorage()}}}
+function aiRefreshUI(){if(S.route==="ambil"){renderCategory();if(S.draft&&S.draft.cropState==="nomodel")renderPhoto()}else if(S.route==="atur"){const el=$("#ai-panel");if(el){el.innerHTML=aiPanelHTML();showStorage()}}}
 async function aiInit(){
   try{const r=await fetch(AI_CFG.meta,{cache:"no-cache"});if(r.ok)AI.meta=await r.json()}catch{}
   try{
     const m=await aiDB.get(aiKey(AI_CFG.model)),w=await aiDB.get(aiKey(AI_CFG.wasm));
     AI.cached=!!(m&&w);
     // remove files of older model versions
-    try{for(const k of await aiDB.keys()){if(!String(k).startsWith(AI_CFG.version+"|")){const d=await aiDB.open();d.transaction("files","readwrite").objectStore("files").delete(k)}}}catch{}
+    try{for(const k of await aiDB.keys()){if(!String(k).startsWith(AI_CFG.version+"|")&&!String(k).startsWith(CROP_CFG.version+"|")){const d=await aiDB.open();d.transaction("files","readwrite").objectStore("files").delete(k)}}}catch{}
   }catch(e){AI.cached=false}
   AI.state=AI.cached?"cached":(AI.meta?"absent":"unavailable");
   aiRefreshUI();
@@ -593,7 +632,7 @@ async function fetchWithProgress(url,onBytes){
 async function aiDownload(){
   if(AI.state==="downloading")return;
   AI.state="downloading";AI.progress=0;AI.err=null;aiRefreshUI();
-  const total=(AI.meta?.files?.model_bytes||0)+(AI.meta?.files?.wasm_bytes||0)||1;let got=0;let last=0;
+  const total=(AI.meta?.files?.model_bytes||0)+(AI.meta?.files?.wasm_bytes||0)+CROP_CFG.bytes||1;let got=0;let last=0;
   const tick=b=>{got+=b;AI.progress=Math.min(99,Math.round(got/total*100));const now=Date.now();if(now-last>150){last=now;aiRefreshUI()}};
   try{
     try{if(navigator.storage&&navigator.storage.persist)await navigator.storage.persist()}catch{}
@@ -609,9 +648,11 @@ async function aiDownload(){
       }
       await aiDB.put(aiKey(AI_CFG.model),buf);
     }
+    await cropDownload(tick);
     AI.cached=true;AI.state="cached";aiRefreshUI();
     await aiLoad();
-    if(AI.state==="ready"&&S.route==="ambil"&&S.draft&&S.draft.blob&&S.draft.ai.status==="idle"&&!selectedGroup())runAI();
+    if(S.route==="ambil"&&S.draft&&S.draft.src&&cropOn()&&S.draft.cropState==="nomodel")autoCrop();
+    else if(AI.state==="ready"&&S.route==="ambil"&&S.draft&&S.draft.blob&&S.draft.ai.status==="idle"&&!selectedGroup())runAI();
   }catch(e){AI.state="error";AI.err=e&&e.name==="QuotaExceededError"?"Ruang penyimpanan perangkat tidak cukup untuk menyimpan model.":"Model gagal diunduh: "+(e.message||e);aiRefreshUI()}
 }
 async function loadOrt(){
@@ -726,7 +767,7 @@ function aiPanelHTML(){
   return `<div class="card-h"><h2>AI lokal</h2><span class="chip ${st.chip}">${esc(st.text)}</span></div>
   ${S.role==="admin"?`<label class="field">Rekomendasi kategori<select id="p-ai"><option value="local" ${S.project.aiMode!=="off"?"selected":""}>Aktif — model lokal di perangkat</option><option value="off" ${S.project.aiMode==="off"?"selected":""}>Mati — klasifikasi manual saja</option></select></label>
   <label class="field">Belajar dari foto proyek<select id="p-learn"><option value="verified" ${S.project.aiLearn!=="all"?"selected":""}>Hanya foto terverifikasi pemeriksa</option><option value="all" ${S.project.aiLearn==="all"?"selected":""}>Semua foto yang sudah berlabel</option></select></label>`:""}
-  ${m?`<dl class="kv"><dt>Model</dt><dd>${esc(m.name)} · versi ${esc(m.version)}</dd><dt>Arsitektur</dt><dd>${esc(m.architecture)}</dd><dt>Ukuran unduhan</dt><dd>${mb(f.model_bytes)} model + ${mb(f.wasm_bytes)} runtime ONNX = ${mb(f.model_bytes+f.wasm_bytes)}</dd><dt>Runtime</dt><dd>ONNX Runtime Web ${esc(AI_CFG.ortVersion)} (WebAssembly, 1 thread)</dd>${ev?`<dt>Akurasi uji</dt><dd>${esc(ev.summary)}</dd>`:""}<dt>Lisensi</dt><dd>${esc(m.license)}</dd><dt>Akurasi di proyek ini</dt><dd>${(()=>{const f=fieldAccuracy();return f.n?`${Math.round(f.acc*100)}% cocok dengan label final pada ${f.n} foto terverifikasi`:"belum ada foto terverifikasi yang punya prediksi AI"})()}</dd><dt>Perangkat ini</dt><dd>${aiMedianMs()!=null?`median ${aiMedianMs()} ms dari ${AI.times.length} foto`:AI.bench?`median ${AI.bench} ms (uji kecepatan)`:"belum diukur"}</dd></dl>`:""}
+  ${m?`<dl class="kv"><dt>Model</dt><dd>${esc(m.name)} · versi ${esc(m.version)}</dd><dt>Arsitektur</dt><dd>${esc(m.architecture)}</dd><dt>Ukuran unduhan</dt><dd>${mb(f.model_bytes)} model kategori + ${mb(CROP_CFG.bytes)} model potong objek + ${mb(f.wasm_bytes)} runtime ONNX = ${mb(f.model_bytes+f.wasm_bytes+CROP_CFG.bytes)}</dd><dt>Potong objek</dt><dd>${esc(CROP_CFG.license)} · ${CROP.state==="ready"?"siap":CROP.state==="error"?"gagal dimuat":"dimuat saat dipakai"}${CROP.times.length?` · ±${CROP.times.slice().sort((a,b)=>a-b)[Math.floor(CROP.times.length/2)]} ms/foto`:""}</dd><dt>Runtime</dt><dd>ONNX Runtime Web ${esc(AI_CFG.ortVersion)} (WebAssembly, 1 thread)</dd>${ev?`<dt>Akurasi uji</dt><dd>${esc(ev.summary)}</dd>`:""}<dt>Lisensi</dt><dd>${esc(m.license)}</dd><dt>Akurasi di proyek ini</dt><dd>${(()=>{const f=fieldAccuracy();return f.n?`${Math.round(f.acc*100)}% cocok dengan label final pada ${f.n} foto terverifikasi`:"belum ada foto terverifikasi yang punya prediksi AI"})()}</dd><dt>Perangkat ini</dt><dd>${aiMedianMs()!=null?`median ${aiMedianMs()} ms dari ${AI.times.length} foto`:AI.bench?`median ${AI.bench} ms (uji kecepatan)`:"belum diukur"}</dd></dl>`:""}
   ${AI.state==="downloading"?`<div class="progress"><span style="width:${AI.progress}%"></span></div>`:""}
   ${AI.err?`<p class="note warn" style="font-size:.82rem">${esc(AI.err)}</p>`:""}
   <div class="row">${AI.state==="absent"||AI.state==="error"&&!AI.cached?`<button class="btn primary" data-act="aiDownload">Unduh model ke perangkat</button>`:""}
@@ -748,6 +789,94 @@ function gray(src,w,h){const cv=document.createElement("canvas");cv.width=w;cv.h
 function dhash(src){const g=gray(src,9,8);let bits="";for(let y=0;y<8;y++)for(let x=0;x<8;x++)bits+=g[y*9+x]>g[y*9+x+1]?"1":"0";let hex="";for(let i=0;i<64;i+=4)hex+=parseInt(bits.slice(i,i+4),2).toString(16);return hex}
 function blurScore(src){const w=320,h=Math.max(8,Math.round(src.height/src.width*320));const g=gray(src,w,h);let n=0,sum=0,sq=0;for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){const i=y*w+x;const l=4*g[i]-g[i-1]-g[i+1]-g[i-w]-g[i+w];sum+=l;sq+=l*l;n++}const m=sum/n;return sq/n-m*m}
 
+/* ---------- auto-crop (U²-Net-p saliency, ONNX Runtime Web, on this device) ---------- */
+const CROP_CFG={version:"u2netp-v1",model:"models/u2netp.onnx",modelB64:"models/u2netp.onnx.b64.txt",bytes:4574861,b64bytes:6099816,size:320,license:"U²-Net-p (Qin dkk., 2020), Apache-2.0"};
+const CROP={state:"absent",session:null,err:null,loading:null,times:[]};
+const cropKey=()=>CROP_CFG.version+"|"+CROP_CFG.model;
+function cropOn(){return !!(S.project&&S.project.autoCrop!==false)}
+async function cropInit(){try{CROP.state=(await aiDB.get(cropKey()))?"cached":"absent"}catch{CROP.state="absent"}}
+async function fetchModelBytes(raw,b64,onBytes,scale){
+  let buf=null;try{buf=await fetchWithProgress(raw,onBytes)}catch{buf=null}
+  if(!buf||new Uint8Array(buf.slice(0,1))[0]===60){
+    const txt=new TextDecoder().decode(await fetchWithProgress(b64,b=>onBytes(b*scale)));
+    const bin=atob(txt.trim());const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);buf=u.buffer;
+  }
+  return buf;
+}
+async function cropDownload(onBytes){
+  if(await aiDB.get(cropKey()).catch(()=>null)){onBytes&&onBytes(CROP_CFG.bytes);return}
+  const buf=await fetchModelBytes(CROP_CFG.model,CROP_CFG.modelB64,onBytes||(()=>{}),CROP_CFG.bytes/CROP_CFG.b64bytes);
+  await aiDB.put(cropKey(),buf);CROP.state="cached";
+}
+/* Load the saliency model. Downloads it (4,4 MB) only if the runtime is already on this device or download=true. */
+async function cropLoad(download){
+  if(CROP.session)return CROP.session;if(CROP.loading)return CROP.loading;
+  CROP.loading=(async()=>{
+    try{
+      let wasm=await aiDB.get(aiKey(AI_CFG.wasm)).catch(()=>null);
+      let model=await aiDB.get(cropKey()).catch(()=>null);
+      if(!wasm||!model){
+        if(!download&&!wasm){CROP.state="absent";return null}
+        CROP.state="downloading";
+        if(!wasm){wasm=await fetchWithProgress(AI_CFG.wasm,()=>{});await aiDB.put(aiKey(AI_CFG.wasm),wasm)}
+        if(!model){await cropDownload();model=await aiDB.get(cropKey())}
+      }
+      CROP.state="loading";
+      const ort=await loadOrt();
+      ort.env.wasm.wasmBinary=wasm;ort.env.wasm.numThreads=1;ort.env.wasm.proxy=false;try{ort.env.logLevel="error"}catch{}
+      CROP.session=await ort.InferenceSession.create(new Uint8Array(model),{executionProviders:["wasm"],graphOptimizationLevel:"all"});
+      CROP.state="ready";CROP.err=null;return CROP.session;
+    }catch(e){console.warn(e);CROP.session=null;CROP.state="error";CROP.err=String(e&&e.message||e);return null}
+    finally{CROP.loading=null}
+  })();
+  return CROP.loading;
+}
+/* Saliency → bounding box of the main object (normalised 0..1).
+   confident=false when the map is weak or scattered: the caller keeps the full photo and asks for a manual crop. */
+function cropBoxFromMap(p,N){
+  let mx=-Infinity,mn=Infinity;for(const v of p){if(v>mx)mx=v;if(v<mn)mn=v}
+  const q=new Float32Array(p.length),rng=(mx-mn)||1;let n5=0,n2=0;
+  for(let i=0;i<p.length;i++){q[i]=(p[i]-mn)/rng;if(q[i]>0.5)n5++;if(q[i]>0.2)n2++}
+  const f5=n5/p.length,f2=n2/p.length;
+  // connected components of q>0.5 (4-neighbour)
+  const lab=new Int32Array(p.length),comps=[];let cur=0;const st=[];
+  for(let i=0;i<p.length;i++){
+    if(q[i]<=0.5||lab[i])continue;cur++;let size=0,x0=N,y0=N,x1=-1,y1=-1;st.push(i);lab[i]=cur;
+    while(st.length){const j=st.pop(),x=j%N,y=(j/N)|0;size++;if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;
+      for(const k of [x>0?j-1:-1,x<N-1?j+1:-1,y>0?j-N:-1,y<N-1?j+N:-1])if(k>=0&&!lab[k]&&q[k]>0.5){lab[k]=cur;st.push(k)}}
+    comps.push({size,x0,y0,x1,y1});
+  }
+  if(!comps.length)return {box:{x:0,y:0,w:1,h:1},confident:false,raw:mx,f5,f2};
+  const big=Math.max(...comps.map(c=>c.size));
+  let X0=N,Y0=N,X1=0,Y1=0;for(const c of comps)if(c.size>=0.15*big){X0=Math.min(X0,c.x0);Y0=Math.min(Y0,c.y0);X1=Math.max(X1,c.x1+1);Y1=Math.max(Y1,c.y1+1)}
+  let x=X0/N,y=Y0/N,w=(X1-X0)/N,h=(Y1-Y0)/N;const pad=0.06*Math.max(w,h);
+  x=Math.max(0,x-pad);y=Math.max(0,y-pad);w=Math.min(1-x,w+2*pad);h=Math.min(1-y,h+2*pad);
+  const confident=mx>0.9&&f2>0&&f5/f2>0.5&&f5>0.005&&w*h<0.92;
+  const fills=!confident&&mx>0.9&&w*h>=0.92&&f5>0.3;
+  return {box:{x,y,w,h},confident,fills,raw:mx,f5,f2};
+}
+async function cropDetect(canvas){
+  const sess=await cropLoad(false);if(!sess)throw new Error(CROP.err||"Model potong otomatis belum diunduh.");
+  const N=CROP_CFG.size,cv=document.createElement("canvas");cv.width=N;cv.height=N;
+  const cx=cv.getContext("2d",{willReadFrequently:true});cx.imageSmoothingQuality="high";cx.drawImage(canvas,0,0,N,N);
+  const d=cx.getImageData(0,0,N,N).data,P=N*N,a=new Float32Array(3*P);
+  let m=1;for(let i=0;i<P;i++){const r=d[i*4],g=d[i*4+1],b=d[i*4+2];if(r>m)m=r;if(g>m)m=g;if(b>m)m=b}
+  const mean=[0.485,0.456,0.406],std=[0.229,0.224,0.225];
+  for(let i=0;i<P;i++)for(let c=0;c<3;c++)a[c*P+i]=(d[i*4+c]/m-mean[c])/std[c];
+  const t0=performance.now();
+  const out=await sess.run({[sess.inputNames[0]]:new AI.ort.Tensor("float32",a,[1,3,N,N])});
+  const ms=Math.round(performance.now()-t0);CROP.times=[ms,...CROP.times].slice(0,20);
+  return {...cropBoxFromMap(out[sess.outputNames[0]].data,N),ms};
+}
+/* Cut the normalised box out of the source canvas. */
+function cropCanvas(src,box){
+  const b=box||{x:0,y:0,w:1,h:1};
+  const sx=Math.round(b.x*src.width),sy=Math.round(b.y*src.height),sw=Math.max(16,Math.round(b.w*src.width)),sh=Math.max(16,Math.round(b.h*src.height));
+  const cv=document.createElement("canvas");cv.width=Math.min(sw,src.width-sx);cv.height=Math.min(sh,src.height-sy);
+  const cx=cv.getContext("2d");cx.fillStyle="#fff";cx.fillRect(0,0,cv.width,cv.height);cx.drawImage(src,sx,sy,cv.width,cv.height,0,0,cv.width,cv.height);return cv;
+}
+const isFullBox=b=>!b||(b.x<=0.001&&b.y<=0.001&&b.w>=0.998&&b.h>=0.998);
+
 
 /* ---------- Supabase store ---------- */
 class Store{
@@ -755,12 +884,14 @@ class Store{
   async all(q){const out=[];for(let from=0;;from+=1000){const {data,error}=await q().range(from,from+999);if(error)throw error;out.push(...data);if(data.length<1000)break}return out}
   mapProject(r){return {...(r.data||{}),id:r.id,name:r.name,createdAt:r.created_at}}
   mapGroup(r){return {id:r.id,code:r.id,category:r.category,lastRep:r.last_rep,createdAt:r.created_at,updatedAt:r.updated_at}}
-  mapImage(r){return {...(r.data||{}),id:r.id,group_id:r.group_id,object_code:r.group_id,filename:r.filename,repetition_number:r.repetition_number,verification_status:r.verification_status}}
+  mapImage(r){return {...(r.data||{}),id:r.id,group_id:r.group_id,object_code:r.group_id,filename:r.filename,repetition_number:r.repetition_number,verification_status:r.verification_status,
+    roboflow_status:r.roboflow_status||null,roboflow_id:r.roboflow_id||null,roboflow_error:r.roboflow_error||null,roboflow_at:r.roboflow_at||null}}
   async rows(kind,pid){
     if(kind==="profiles")return await this.all(()=>this.c.from("profiles").select("user_id,username,full_name,role,photographer_code,active,created_at").order("created_at"));
     if(kind==="projects")return (await this.all(()=>this.c.from("projects").select("id,name,data,created_at").order("created_at"))).map(r=>this.mapProject(r));
     if(kind==="groups")return (await this.all(()=>this.c.from("object_groups").select("*").eq("project_id",pid).order("id"))).map(r=>this.mapGroup(r));
-    if(kind==="images")return (await this.all(()=>this.c.from("images").select("id,group_id,filename,repetition_number,verification_status,data").eq("project_id",pid).order("created_at"))).map(r=>this.mapImage(r));
+    if(kind==="images")return (await this.all(()=>this.c.from("images").select("id,group_id,filename,repetition_number,verification_status,data,roboflow_status,roboflow_id,roboflow_error,roboflow_at").eq("project_id",pid).order("created_at"))).map(r=>this.mapImage(r));
+    if(kind==="members")return (await this.all(()=>this.c.from("project_members").select("project_id,user_id").order("project_id"))).map(r=>({...r,id:r.project_id+":"+r.user_id}));
     if(kind==="counters"){const rs=await this.all(()=>this.c.from("counters").select("last_number").eq("project_id",pid));return [{id:"counter",last:rs[0]?rs[0].last_number:0}]}
     return [];
   }
@@ -770,7 +901,7 @@ class Store{
     const emit=()=>{if(alive&&cache)cb(Array.from(cache.values()))};
     const reload=async()=>{try{const rows=await this.rows(kind,pid);if(!alive)return;cache=new Map(rows.map(r=>[idOf(r),r]));failed=false;emit()}catch(e){console.warn(e);if(alive&&!failed){failed=true;toast("Gagal memuat data: "+errMsg(e),"bad")}}};
     const later=()=>{clearTimeout(tmr);tmr=setTimeout(reload,400)};
-    const table={profiles:"profiles",projects:"projects",groups:"object_groups",images:"images",counters:"counters"}[kind];
+    const table={profiles:"profiles",projects:"projects",groups:"object_groups",images:"images",counters:"counters",members:"project_members"}[kind];
     const opt={event:"*",schema:"public",table};if(pid)opt.filter="project_id=eq."+pid;
     const ch=this.c.channel("adc-"+key+"-"+uid()).on("postgres_changes",opt,pl=>{
       if(!cache)return later();
@@ -786,6 +917,7 @@ class Store{
     return()=>{alive=false;clearInterval(iv);clearTimeout(tmr);document.removeEventListener("visibilitychange",vis);window.removeEventListener("online",later);try{this.c.removeChannel(ch)}catch{}this.subs.delete(key)};
   }
   refresh(kind,pid){this.subs.get(kind+":"+(pid||""))?.reload()}
+  refreshAll(kind){for(const [k,v] of this.subs)if(k.startsWith(kind+":"))v.reload()}
   patchImage(r){this.subs.get("images:"+r.project_id)?.patch(r)}
   async rpc(fn,args){const {data,error}=await this.c.rpc(fn,args);if(error)throw error;return data}
   async saveImage(c){
@@ -793,7 +925,7 @@ class Store{
     const up=await this.c.storage.from("photos").upload(path,c.blob,{contentType:"image/jpeg",upsert:false});
     if(up.error)throw up.error;
     try{
-      const row=await this.rpc("save_image",{p_project:c.pid,p_group:c.groupId,p_category:c.category,p_location:c.location,p_lighting:c.lighting,p_date:c.date,p_row:{...c.row,asset_id:path}});
+      const row=await this.rpc("save_image",{p_project:c.pid,p_group:c.groupId,p_category:c.category,p_location:c.location,p_lighting:c.lighting,p_date:c.date,p_row:{...c.row,asset_id:path},p_code:c.code||null});
       this.refresh("groups",c.pid);this.refresh("counters",c.pid);
       return row;
     }catch(e){await this.c.storage.from("photos").remove([path]).catch(()=>{});throw e}
@@ -808,7 +940,21 @@ class Store{
     for(;;){const {data,error}=await b.list(pid,{limit:100});if(error)throw error;if(!data||!data.length)break;const {error:e2}=await b.remove(data.map(f=>pid+"/"+f.name));if(e2)throw e2;if(data.length<100)break}
     const {error}=await this.c.from("projects").delete().eq("id",pid);if(error)throw error;this.refresh("projects");
   }
-  async createUser(u){const id=await this.rpc("admin_create_user",{p_username:u.username,p_password:u.password,p_full_name:u.full_name,p_role:u.role,p_code:u.code});this.refresh("profiles");return id}
+  async createUser(u){const id=await this.rpc("admin_create_user",{p_username:u.username,p_password:u.password,p_full_name:u.full_name,p_role:u.role,p_code:u.code,p_projects:u.projects||[]});this.refresh("profiles");this.refresh("members");return id}
+  async setUserProjects(uid,pids){await this.rpc("set_user_projects",{p_user:uid,p_projects:pids});this.refresh("members")}
+  async setProjectMembers(pid,uids){await this.rpc("set_project_members",{p_project:pid,p_users:uids});this.refresh("members")}
+  async setRoboflowKey(pid,key){await this.rpc("set_roboflow_key",{p_project:pid,p_key:key})}
+  async hasRoboflowKey(pid){return !!(await this.rpc("has_roboflow_key",{p_project:pid}))}
+  async roboflowSync(pid,ids){
+    const {data,error}=await this.c.functions.invoke("roboflow-sync",{body:ids?{project_id:pid,image_ids:ids}:{project_id:pid}});
+    if(error){
+      let msg=error.message||String(error),status=error.context&&error.context.status;
+      try{const j=await error.context.json();msg=j.error||j.message||msg}catch{}
+      if(status===404||/not found|Failed to send a request/i.test(msg))msg="Edge Function roboflow-sync belum dipasang di Supabase (lihat README).";
+      throw new Error(msg);
+    }
+    return data;
+  }
   async updateUser(id,u){await this.rpc("admin_update_user",{p_user:id,p_full_name:u.full_name,p_role:u.role,p_code:u.code,p_active:u.active});this.refresh("profiles")}
   async setPassword(id,pw){await this.rpc("admin_set_password",{p_user:id,p_password:pw})}
   async deleteUser(id){await this.rpc("admin_delete_user",{p_user:id});this.refresh("profiles")}
@@ -831,7 +977,7 @@ class Store{
 /* ---------- state ---------- */
 const S={
   sb:null,store:null,user:null,me:null,role:null,downloads:null,
-  profiles:[],projects:[],pid:null,project:null,groups:[],images:[],counter:0,
+  profiles:[],projects:[],members:[],rfKey:{},rfBusy:false,pid:null,project:null,groups:[],images:[],counter:0,
   unsubs:[],baseUnsubs:[],route:"beranda",sub:null,
   session:null,draft:null,cam:{stream:null,facing:"environment",devices:[],open:false,err:null,state:"idle"},
   recent:[],lastSaved:null,gq:"",
@@ -844,7 +990,8 @@ const P=()=>S.pid;
 function defaultProject(name){
   return {name:name||"Dataset Sampah Kampus",description:"Pengumpulan citra sampah per kategori untuk pelatihan dan pengujian model klasifikasi.",
     categories:DEFAULT_CATS.map(c=>({...c})),lightings:DEFAULT_LIGHTS.map(l=>({...l})),
-    targetPerCategory:200,jpegQuality:0.9,maxDim:1600,aiMode:"local",aiLearn:"verified",startDate:todayIso(),status:"aktif"};
+    targetPerCategory:200,jpegQuality:0.9,maxDim:1600,aiMode:"local",aiLearn:"verified",autoCrop:true,startDate:todayIso(),status:"aktif",
+    roboflow:{enabled:false,project:"",split:"auto",batch:"dataset-collector"}};
 }
 
 /* ---------- boot & auth ---------- */
@@ -944,6 +1091,9 @@ async function startSession(user){
   document.body.classList.remove("noauth");$("#authroot").hidden=true;$("#authroot").innerHTML="";$("#shell").hidden=false;$("#tabbar").hidden=false;
   S.baseUnsubs.push(S.store.sub("profiles",null,onProfiles));
   S.baseUnsubs.push(S.store.sub("projects",null,onProjects));
+  // membership changes (admin adds/removes this user) reload the visible projects
+  let firstMembers=true;
+  S.baseUnsubs.push(S.store.sub("members",null,rows=>{S.members=rows;if(firstMembers){firstMembers=false;return}S.store.refresh("projects");if(S.route==="atur")renderSoft()}));
   renderNav();onRoute();
 }
 function onProfiles(rows){
@@ -980,12 +1130,14 @@ function initSession(){
   S.session={location:ls.get("loc:"+S.pid,""),lighting:l.some(x=>x.code===savedLight)?savedLight:l[0].code,dateIso:todayIso()};
   S.draft=newDraft();S.lastSaved=null;S.recent=[];
 }
-function newDraft(group){return {blob:null,url:null,w:0,h:0,size:0,blur:null,hash:null,flags:[],origName:null,ai:{status:"idle"},category:"",groupChoice:group||null,note:"",similar:null}}
+function newDraft(group){return {token:null,src:null,srcUrl:null,srcW:0,srcH:0,crop:{x:0,y:0,w:1,h:1},cropState:"none",cropInfo:null,cropErr:null,cropBusy:false,
+  blob:null,url:null,w:0,h:0,size:0,blur:null,hash:null,flags:[],origName:null,ai:{status:"idle"},category:"",groupChoice:group||null,manualCode:"",manualInput:"",note:"",similar:null}}
+function freeDraft(d){if(!d)return;if(d.url)URL.revokeObjectURL(d.url);if(d.srcUrl)URL.revokeObjectURL(d.srcUrl)}
 async function signOut(){try{await S.sb.auth.signOut()}catch{}if(S.user)resetSession()}
 function resetSession(){
   stopCamera(true);closeModal();
   clearProject();S.baseUnsubs.forEach(u=>{try{u()}catch{}});S.baseUnsubs=[];
-  Object.assign(S,{user:null,me:null,role:null,store:null,profiles:[],projects:[],recent:[],lastSaved:null,newCred:null,sub:null,authMsg:null,authBusy:false});
+  Object.assign(S,{user:null,me:null,role:null,store:null,profiles:[],projects:[],members:[],rfKey:{},recent:[],lastSaved:null,newCred:null,sub:null,authMsg:null,authBusy:false});
   location.hash="";showAuth();
 }
 
@@ -1027,7 +1179,7 @@ function render(){
 function afterRender(){
   if(S.route==="ambil")renderCaptureParts();
   if(S.route==="galeri")hydrate();
-  if(S.route==="atur")showStorage();
+  if(S.route==="atur"){showStorage();if(S.sub==="proyek")loadRfKey()}
 }
 function pageHead(title,sub){
   const pick=S.projects.length>1?`<label class="projpick"><span class="eyebrow">Proyek</span><select id="projSel" aria-label="Pilih proyek">${S.projects.map(p=>`<option value="${esc(p.id)}" ${p.id===S.pid?"selected":""}>${esc(p.name)}</option>`).join("")}</select></label>`:"";
@@ -1037,8 +1189,8 @@ function noProject(){
   if(can("admin"))return `<section class="card" style="max-width:620px"><div class="card-h"><div class="lead"><span class="step">1</span><h2>Buat proyek dataset pertama</h2></div></div>
     <p class="muted">Proyek menyimpan kategori, kondisi cahaya, dan target foto. Konfigurasi awal mengikuti standar PRD: organik, kertas, plastik, logam, residu, dengan cahaya in/out. Semua bisa diubah nanti di Pengaturan.</p>
     <form id="f-newproj" class="stack"><label class="field">Nama proyek<input type="text" id="np-name" value="Dataset Sampah Kampus" required></label><button class="btn primary lg" type="submit" style="align-self:flex-start">${ICON.plus} Buat proyek</button></form></section>
-    <section class="card" style="max-width:620px"><div class="card-h"><div class="lead"><span class="step">2</span><h2>Tambahkan anggota tim</h2></div></div><p class="muted">Setelah proyek dibuat, buka <b>Pengaturan → Pengguna</b> untuk membuat akun pengumpul dan pemeriksa.</p></section>`;
-  return `<div class="empty-state"><div class="ic">${ICON.folder}</div><h2>Belum ada proyek</h2><p style="max-width:44ch">Admin belum membuat proyek dataset. Hubungi admin, lalu muat ulang halaman ini.</p></div>`;
+    <section class="card" style="max-width:620px"><div class="card-h"><div class="lead"><span class="step">2</span><h2>Tambahkan anggota tim</h2></div></div><p class="muted">Setelah proyek dibuat, buka <b>Pengaturan → Pengguna</b> untuk membuat akun anggota dan memilih proyek yang boleh mereka buka.</p></section>`;
+  return `<div class="empty-state"><div class="ic">${ICON.folder}</div><h2>Belum ada proyek untuk Anda</h2><p style="max-width:46ch">Akun Anda belum ditambahkan ke proyek mana pun. Minta admin menambahkan Anda di <b>Pengaturan → Pengguna</b>. Halaman ini otomatis terbuka setelah Anda ditambahkan.</p></div>`;
 }
 document.addEventListener("change",e=>{if(e.target.id==="projSel")selectProject(e.target.value)});
 
@@ -1073,7 +1225,7 @@ function qualityIssues(){
   const st=stats();const withP=st.perCat.filter(c=>c.photos>0);
   if(withP.length>=2){const mx=Math.max(...st.perCat.map(c=>c.photos)),mn=Math.min(...st.perCat.map(c=>c.photos));if(mn===0||mx/mn>1.5)out.push({sev:"warn",text:`Jumlah foto antar kategori belum seimbang (terbanyak ${mx}, tersedikit ${mn}).`})}
   {const f=fieldAccuracy();if(f.n>=10)out.push({sev:f.acc<0.7?"warn":"info",text:`Rekomendasi AI cocok dengan label final pada ${Math.round(f.acc*100)}% dari ${f.n} foto terverifikasi.`})}
-  if(st.pending)out.push({sev:"info",text:`${st.pending} foto belum diverifikasi pemeriksa.`,filter:{status:"pending"}});
+  if(st.pending)out.push({sev:"info",text:`${st.pending} foto belum diverifikasi.`,filter:{status:"pending"}});
   return out;
 }
 function nameOfCode(code){const p=S.profiles.find(x=>x.photographer_code===code);return p?(p.full_name||p.username):""}
@@ -1143,12 +1295,42 @@ function renderSteps(){
   const marks={st1:!!(m.location&&m.lighting&&validYmd(m.date)),st2:!!d.blob,st3:!!m.code,st4:!!m.category};
   for(const [id,done] of Object.entries(marks)){const el=$("#"+id);if(el){el.classList.toggle("done",done);el.innerHTML=done?ICON.check.replace('class="i"','class="i" style="width:15px;height:15px"'):id.slice(2)}}
 }
+function cropStatus(d){
+  const pct=b=>Math.round(b.w*b.h*100);
+  switch(d.cropState){
+    case "running":return {chip:"acc",text:"Mencari objek…",spin:true};
+    case "auto":return {chip:"ok",text:`Dipotong otomatis · ${pct(d.crop)}% foto`,note:"Hanya bagian di dalam kotak yang disimpan. Geser kotak atau tarik sudutnya bila objek terpotong."};
+    case "unsure":return {chip:"warn",text:"Objek kurang jelas",note:"Potong otomatis tidak yakin letak objeknya, jadi foto disimpan utuh. Tarik sudut kotak ke tepi objek untuk memotong manual.",cls:"warn"};
+    case "manual":return {chip:"acc",text:`Diatur manual · ${pct(d.crop)}% foto`};
+    case "full":return {chip:"",text:"Foto penuh (tanpa potong)"};
+    case "fills":return {chip:"ok",text:"Objek memenuhi foto",note:"Objek sudah mengisi hampir seluruh foto, jadi foto disimpan utuh. Tarik sudut kotak bila ingin memotong."};
+    case "nomodel":return {chip:"",text:"Potong manual",note:"nomodel"};
+    case "error":return {chip:"warn",text:"Potong otomatis gagal",note:(d.cropErr||"")+" Atur kotak secara manual.",cls:"warn"};
+    case "off":return {chip:"",text:"Potong manual",note:"Tarik sudut kotak ke tepi objek. Hanya bagian di dalam kotak yang disimpan."};
+    default:return {chip:"",text:""};
+  }
+}
+function cropBoxStyle(b){return `left:${(b.x*100).toFixed(3)}%;top:${(b.y*100).toFixed(3)}%;width:${(b.w*100).toFixed(3)}%;height:${(b.h*100).toFixed(3)}%`}
 function renderPhoto(){
   const el=$("#cap-photo");if(!el)return;const d=S.draft,last=S.lastSaved;
   let body;
-  if(d.blob){
-    body=`<div class="stage has"><img class="shot" src="${d.url}" alt="Foto yang baru diambil"><div class="badges"><span class="chip">${d.w}×${d.h} px</span><span class="chip">${Math.round(d.size/1024)} KB</span>${d.flags.map(f=>`<span class="chip warn">${f==="buram"?"Mungkin buram":"Resolusi kecil"}</span>`).join("")}</div></div>
-    <div class="row"><button class="btn" data-act="openCam">${ICON.redo} Ambil ulang</button><button class="btn ghost" data-act="pickLib">${ICON.img} Ganti dari galeri</button></div>
+  if(d.src){
+    const cs=cropStatus(d),ar=d.srcW/d.srcH,full=isFullBox(d.crop);
+    const dl=cs.note==="nomodel";
+    body=`<div class="cropwrap"><div class="cropper ${full?"full":""} ${d.cropState==="running"?"busy":""}" style="aspect-ratio:${d.srcW}/${d.srcH};width:min(100%,calc(min(62vh,560px) * ${ar.toFixed(4)}))">
+      <img src="${d.srcUrl}" alt="Foto asli ${d.srcW}×${d.srcH} px" draggable="false">
+      <div class="cbox" data-crop="move" style="${cropBoxStyle(d.crop)}" aria-label="Area yang disimpan">
+        <i class="h nw" data-crop="nw"></i><i class="h ne" data-crop="ne"></i><i class="h sw" data-crop="sw"></i><i class="h se" data-crop="se"></i></div>
+      ${d.cropState==="running"?`<div class="cscan"><span class="chip acc"><span class="spin" style="width:11px;height:11px"></span> Mencari objek…</span></div>`:""}
+    </div></div>
+    <div class="cropbar"><span class="chip ${cs.chip}">${esc(cs.text)}</span><span class="muted small" id="crop-dims">Disimpan: ${d.w}×${d.h} px${d.size?` · ${Math.round(d.size/1024)} KB`:""}</span>
+      ${d.flags.map(f=>`<span class="chip warn">${f==="buram"?"Mungkin buram":"Resolusi kecil"}</span>`).join("")}</div>
+    ${cs.note&&!dl?`<p class="note ${cs.cls||""}" style="font-size:.84rem">${esc(cs.note)}</p>`:""}
+    ${dl?`<div class="note stack" style="gap:8px"><span>Potong otomatis butuh model di perangkat ini (${mb(CROP_CFG.bytes+(AI.meta?.files?.wasm_bytes||0))} sekali unduh, termasuk runtime). Sementara itu, tarik sudut kotak untuk memotong manual.</span><button class="btn sm primary" data-act="aiDownload" style="align-self:flex-start" ${AI.state==="downloading"?"disabled":""}>${AI.state==="downloading"?`Mengunduh ${AI.progress}%`:"Unduh model"}</button></div>`:""}
+    <div class="row"><button class="btn" data-act="openCam">${ICON.redo} Ambil ulang</button><button class="btn ghost" data-act="pickLib">${ICON.img} Ganti</button>
+      <span style="flex:1"></span>
+      ${cropOn()&&d.cropState!=="running"&&!dl?`<button class="btn sm ghost" data-act="cropAuto">${ICON.ai} Potong otomatis</button>`:""}
+      ${!full?`<button class="btn sm ghost" data-act="cropFull">Foto penuh</button>`:""}</div>
     ${d.flags.includes("buram")?'<p class="note warn">Ketajaman foto rendah. Pertimbangkan ambil ulang dengan tangan lebih stabil atau cahaya lebih terang.</p>':""}`;
   }else if(last){
     body=`<div class="stage auto"><div class="saved"><div class="head"><span class="ok-ic">${ICON.check}</span><div class="stack" style="gap:2px;min-width:0"><b>Foto tersimpan</b><span class="mono small" style="word-break:break-all">${esc(last.filename)}</span></div></div>
@@ -1156,10 +1338,73 @@ function renderPhoto(){
     <button class="btn primary lg block" data-act="newObj">${ICON.cam} Foto objek baru</button>
     <button class="btn ghost sm" data-act="pickLib" style="align-self:center">${ICON.img} Pilih dari galeri</button></div></div>`;
   }else{
-    body=`<div class="stage"><div class="empty"><button class="bigcam" data-act="openCam" aria-label="Buka kamera">${ICON.cam}</button><div class="stack" style="gap:3px;align-items:center"><b>Ketuk untuk membuka kamera</b><span class="muted small" style="max-width:36ch">Satu foto berisi satu objek fisik. Letakkan objek di tengah bingkai.</span></div>
+    body=`<div class="stage"><div class="empty"><button class="bigcam" data-act="openCam" aria-label="Buka kamera">${ICON.cam}</button><div class="stack" style="gap:3px;align-items:center"><b>Ketuk untuk membuka kamera</b><span class="muted small" style="max-width:36ch">Satu foto berisi satu objek fisik. ${cropOn()?"Objek dipotong otomatis, hanya objek yang disimpan.":"Letakkan objek di tengah bingkai."}</span></div>
     <button class="btn ghost sm" data-act="pickLib">${ICON.img} atau pilih dari galeri</button></div></div>`;
   }
   el.innerHTML=`<div class="card-h"><div class="lead"><span class="step" id="st2">2</span><h2>Foto</h2></div></div>${body}`;
+}
+/* manual crop: drag the box or its corners */
+let cdrag=null;
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+function dragBox(st,mode,dx,dy){
+  let {x,y,w,h}=st;const M=0.06;
+  if(mode==="move"){x=clamp(x+dx,0,1-w);y=clamp(y+dy,0,1-h);return {x,y,w,h}}
+  let x0=x,y0=y,x1=x+w,y1=y+h;
+  if(mode.includes("w"))x0=clamp(x0+dx,0,x1-M);if(mode.includes("e"))x1=clamp(x1+dx,x0+M,1);
+  if(mode.includes("n"))y0=clamp(y0+dy,0,y1-M);if(mode.includes("s"))y1=clamp(y1+dy,y0+M,1);
+  return {x:x0,y:y0,w:x1-x0,h:y1-y0};
+}
+document.addEventListener("pointerdown",e=>{
+  const h=e.target.closest("[data-crop]");if(!h||!S.draft||!S.draft.src||S.draft.cropState==="running")return;
+  const wrap=h.closest(".cropper");if(!wrap)return;e.preventDefault();
+  cdrag={mode:h.dataset.crop,x:e.clientX,y:e.clientY,r:wrap.getBoundingClientRect(),start:{...S.draft.crop},el:wrap.querySelector(".cbox"),wrap,moved:false};
+  wrap.classList.add("dragging");try{h.setPointerCapture(e.pointerId)}catch{}
+});
+document.addEventListener("pointermove",e=>{
+  if(!cdrag)return;const dx=(e.clientX-cdrag.x)/cdrag.r.width,dy=(e.clientY-cdrag.y)/cdrag.r.height;
+  if(Math.abs(dx)+Math.abs(dy)>0.004)cdrag.moved=true;
+  const b=dragBox(cdrag.start,cdrag.mode,dx,dy);S.draft.crop=b;cdrag.el.style.cssText=cropBoxStyle(b);cdrag.wrap.classList.toggle("full",isFullBox(b));
+  const dims=$("#crop-dims");if(dims)dims.textContent=`Disimpan: ${Math.round(b.w*S.draft.srcW)}×${Math.round(b.h*S.draft.srcH)} px`;
+});
+function endDrag(){if(!cdrag)return;const c=cdrag;cdrag=null;c.wrap.classList.remove("dragging");if(c.moved){S.draft.cropState=isFullBox(S.draft.crop)?"full":"manual";commitCrop()}}
+document.addEventListener("pointerup",endDrag);document.addEventListener("pointercancel",endDrag);
+async function encodeDraft(d){
+  const cv=cropCanvas(d.src,isFullBox(d.crop)?null:d.crop);
+  const blob=await new Promise(r=>cv.toBlob(r,"image/jpeg",+S.project.jpegQuality||0.9));
+  if(!blob)throw new Error("Konversi JPEG gagal.");
+  const flags=[],bs=blurScore(cv);if(bs<45)flags.push("buram");if(Math.min(cv.width,cv.height)<224)flags.push("kecil");
+  if(d.url)URL.revokeObjectURL(d.url);
+  Object.assign(d,{blob,url:URL.createObjectURL(blob),w:cv.width,h:cv.height,size:blob.size,blur:Math.round(bs),hash:dhash(cv),flags});
+}
+async function commitCrop(){
+  const d=S.draft,token=d.token;if(!d.src)return;
+  d.cropBusy=true;renderSavebar();
+  try{await encodeDraft(d)}catch(e){toast("Gagal memotong foto: "+(e.message||e),"bad")}
+  if(S.draft.token!==token)return;
+  d.cropBusy=false;if(!selectedGroup())d.ai={status:"idle"};
+  renderPhoto();renderSavebar();afterCrop(token);
+}
+async function autoCrop(){
+  const d=S.draft,token=d.token;if(!d.src)return;
+  const haveRuntime=CROP.session||(await aiDB.get(aiKey(AI_CFG.wasm)).catch(()=>null));
+  if(!haveRuntime){d.cropState="nomodel";renderPhoto();renderSavebar();afterCrop(token);return}
+  d.cropState="running";renderPhoto();renderSavebar();
+  try{
+    const r=await cropDetect(d.src);if(S.draft.token!==token)return;
+    d.cropInfo={raw:Math.round(r.raw*1000)/1000,ms:r.ms,confident:r.confident};
+    if(r.confident){d.crop=r.box;d.cropState="auto"}else{d.crop={x:0,y:0,w:1,h:1};d.cropState=r.fills?"fills":"unsure"}
+    await encodeDraft(d);
+  }catch(e){if(S.draft.token!==token)return;console.warn(e);d.cropState="error";d.cropErr=String(e&&e.message||e).slice(0,160)+"."}
+  if(S.draft.token!==token)return;
+  if(!selectedGroup())d.ai={status:"idle"};
+  renderPhoto();renderSavebar();afterCrop(token);
+}
+function afterCrop(token){
+  const d=S.draft;if(d.token!==token||!d.blob)return;
+  let best=null;for(const i of S.images){if(!i.hash)continue;const dd=hamming(i.hash,d.hash);if(dd<=6&&(!best||dd<best.d))best={d:dd,filename:i.filename,code:i.object_code,group_id:i.group_id}}
+  d.similar=best&&best.group_id!==d.groupChoice?best:null;
+  renderGroup();renderSteps();
+  if(aiOn()&&!selectedGroup()&&d.ai.status!=="running"&&(AI.state==="ready"||AI.state==="cached"||AI.state==="loading"))runAI();
 }
 function selectedGroup(){const gc=S.draft.groupChoice;if(!gc||gc==="new")return null;return S.groups.find(g=>g.id===gc)||null}
 function groupStats(){const m=new Map();for(const i of S.images){const e=m.get(i.group_id)||{n:0,first:null,last:""};e.n++;if(!e.first||i.repetition_number<e.first.repetition_number)e.first=i;if((i.created_at||"")>e.last)e.last=i.created_at||"";m.set(i.group_id,e)}return m}
@@ -1168,12 +1413,15 @@ function renderGroup(){
   let list=S.groups.map(g=>({...g,_s:gs.get(g.id)||{n:0,last:g.updatedAt||g.createdAt||""}}));
   list.sort((a,b)=>(b._s.last||"")>(a._s.last||"")?1:-1);
   if(q)list=list.filter(g=>g.code.includes(q.replace(/\D/g,"")||"~")||(g.category||"").includes(q.toLowerCase()));
-  const nxt=pad4(nextCode(S.groups,S.counter)),sg=selectedGroup();
+  const nxt=pad4(nextCode(S.groups,S.counter)),sg=selectedGroup(),man=d.groupChoice==="manual";
+  const mi=d.manualInput||"",mcode=mi?pad4(mi):"",mg=mcode?S.groups.find(g=>g.id===mcode):null;
+  const mhint=!mi?"Kosongkan untuk penomoran otomatis.":mcode==="0000"?"ID objek mulai dari 0001.":mg?`ID ${mcode} sudah ada (${esc(catName(mg.category))}, ${(gs.get(mg.id)||{n:0}).n} foto) → disimpan sebagai ulangan ${(mg.lastRep||0)+1}.`:`ID ${mcode} belum dipakai → objek baru dengan ID ini.`;
   el.innerHTML=`<div class="card-h"><div class="lead"><span class="step" id="st3">3</span><h2>Objek fisik</h2></div><span class="muted small">${S.groups.length} objek tercatat</span></div>
   <div class="objchoice">
-    <button class="objbtn" data-act="gnew" aria-pressed="${d.groupChoice==="new"}"><b>Objek baru</b><span>ID berikutnya</span><span class="big">${nxt}</span></button>
-    <button class="objbtn" data-act="gcont" aria-pressed="${!!sg}"><b>Foto ulang objek</b><span>${sg?"Ulangan berikutnya "+((sg.lastRep||0)+1):"Pilih di daftar bawah"}</span><span class="big">${sg?esc(sg.code):"––––"}</span></button>
+    <button class="objbtn" data-act="gnew" aria-pressed="${d.groupChoice==="new"}"><b>Objek baru</b><span>ID otomatis berikutnya</span><span class="big">${nxt}</span></button>
+    <button class="objbtn" data-act="gcont" aria-pressed="${!!sg&&!mi}"><b>Foto ulang objek</b><span>${sg?"Ulangan berikutnya "+((sg.lastRep||0)+1):"Pilih di daftar bawah"}</span><span class="big">${sg?esc(sg.code):"––––"}</span></button>
   </div>
+  <label class="manualid ${man||(mi&&mg)?"on":""}"><span><b>Atau ketik ID objek sendiri</b><small class="${mi&&mcode==="0000"?"bad":""}">${mhint}</small></span><input type="text" id="g-code" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" placeholder="0025" value="${esc(mi)}" aria-label="ID objek manual"></label>
   ${d.similar?`<p class="note warn">Foto ini sangat mirip dengan objek <b class="mono">${esc(d.similar.code)}</b> (<span class="mono">${esc(d.similar.filename)}</span>). Jika objek fisiknya sama, pilih objek itu. <button class="btn sm" data-act="gpick" data-v="${esc(d.similar.group_id)}">Pakai ${esc(d.similar.code)}</button></p>`:""}
   ${S.groups.length?`<input type="search" id="g-q" placeholder="Cari ID objek atau kategori" value="${esc(S.gq||"")}" aria-label="Cari objek">
   <div class="glist" role="listbox" aria-label="Daftar objek">${list.slice(0,60).map(g=>`<button class="gitem ${clsOf(g.category)}" style="${clsStyle(g.category)}" data-act="gpick" data-v="${esc(g.id)}" aria-pressed="${d.groupChoice===g.id}">
@@ -1197,13 +1445,13 @@ function renderCategory(){
   else{const st=aiStatusLine();status=`<span class="chip ${st.chip}">${esc(st.text)}</span>`}
   const chosen=g?g.category:d.category;
   el.innerHTML=`<div class="card-h"><div class="lead"><span class="step" id="st4">4</span><h2>Kategori</h2></div>${status}</div>
-  ${g?`<p class="note acc">Mengikuti objek <b class="mono">${esc(g.code)}</b>: <b>${esc(catName(g.category))}</b>. Satu objek fisik punya satu kategori; pemeriksa bisa mengoreksinya di Galeri.</p>`:""}
+  ${g?`<p class="note acc">Mengikuti objek <b class="mono">${esc(g.code)}</b>: <b>${esc(catName(g.category))}</b>. Satu objek fisik punya satu kategori; kategori bisa dikoreksi di Galeri.</p>`:""}
   <div class="clsgrid" role="group" aria-label="Pilih kategori">${cats.map(c=>{const cf=g?null:confOf(c.code);const isPred=!g&&pred&&pred.category===c.code;return `<button class="clsbtn ${clsOf(c.code)}" style="${clsStyle(c.code)}" data-act="cat" data-v="${esc(c.code)}" aria-pressed="${chosen===c.code}" ${g?"disabled":""}>
     ${isPred?'<span class="ai">AI</span>':""}<b><i></i>${esc(c.name)}</b>${cf!=null?`<span class="conf">${Math.round(cf*100)}%</span><span class="cbar"><span style="width:${Math.round(cf*100)}%"></span></span>`:`<span class="conf mono">${esc(c.code)}</span>`}</button>`}).join("")}</div>
   ${!g&&pred&&pred.reason?`<p class="muted small">${esc(pred.reason)}</p>`:""}
   ${!g&&ai.status==="error"?`<p class="note warn">${esc(ai.message||"Prediksi gagal.")} Pilih kategori secara manual.</p>`:""}
   ${!g&&pred&&!pred.lowConf&&d.category&&d.category!==pred.category?`<p class="note">Koreksi manual: AI menyarankan <b>${esc(catName(pred.category))}</b>. Saran awal tetap dicatat di metadata.</p>`:""}
-  ${!g&&aiOn()&&(AI.state==="absent"||(AI.state==="error"&&!AI.cached))&&AI.meta?`<div class="note stack" style="gap:8px"><b>Saran kategori AI belum aktif di perangkat ini</b><span>Unduh model sekali (${mb((AI.meta.files.model_bytes||0)+(AI.meta.files.wasm_bytes||0))}). Setelah itu foto dianalisis langsung di perangkat tanpa dikirim ke layanan AI.</span><button class="btn sm primary" data-act="aiDownload" style="align-self:flex-start">Unduh model</button></div>`:""}
+  ${!g&&aiOn()&&S.draft.cropState!=="nomodel"&&(AI.state==="absent"||(AI.state==="error"&&!AI.cached))&&AI.meta?`<div class="note stack" style="gap:8px"><b>Saran kategori AI belum aktif di perangkat ini</b><span>Unduh model sekali (${mb((AI.meta.files.model_bytes||0)+(AI.meta.files.wasm_bytes||0)+CROP_CFG.bytes)}, termasuk model potong objek). Setelah itu foto dianalisis langsung di perangkat tanpa dikirim ke layanan AI.</span><button class="btn sm primary" data-act="aiDownload" style="align-self:flex-start">Unduh model</button></div>`:""}
   ${!g&&aiOn()&&AI.state==="downloading"?`<div class="stack" style="gap:4px"><div class="progress"><span style="width:${AI.progress}%"></span></div><span class="muted small">Mengunduh model ${AI.progress}%. Anda bisa lanjut memilih kategori manual.</span></div>`:""}
   ${!g&&aiOn()&&AI.state==="error"&&AI.err?`<p class="note warn">${esc(AI.err)}</p>`:""}
   ${!g&&d.blob&&aiReady()&&ai.status!=="running"?`<button class="btn sm ghost" data-act="runAI" style="align-self:flex-start">${ICON.ai} ${ai.status==="done"?"Analisis ulang":"Minta saran AI"}</button>`:""}`;
@@ -1213,6 +1461,7 @@ function draftMeta(){
   const s=S.session,d=S.draft,g=selectedGroup();
   let code=null,rep=null,codeProjected=false,repProjected=false;
   if(d.groupChoice==="new"){code=pad4(nextCode(S.groups,S.counter));rep=1;codeProjected=true}
+  else if(d.groupChoice==="manual"){code=d.manualCode||"";rep=1}
   else if(g){code=g.code;rep=(g.lastRep||0)+1;repProjected=true}
   return {category:g?g.category:d.category,location:normLoc(s.location),lighting:s.lighting,date:isoToYmd(s.dateIso),photographer:S.me.photographer_code,code,rep,codeProjected,repProjected};
 }
@@ -1220,12 +1469,13 @@ function renderSavebar(){
   const el=$("#cap-save");if(!el)return;
   const m=draftMeta(),r=buildFilename(m,{categories:S.project.categories,lightings:lightsOf()}),d=S.draft;
   const errs=[...r.errors];if(!d.blob)errs.unshift("Ambil atau pilih foto.");
+  const cropWait=d.cropState==="running"||d.cropBusy;
   el.innerHTML=`<div class="card-h"><div class="lead"><span class="step" style="background:var(--accent);color:var(--accent-ink)">${ICON.check.replace('class="i"','class="i" style="width:15px;height:15px"')}</span><h2>Nama berkas</h2></div>${r.ok&&d.blob?'<span class="chip ok">Siap disimpan</span>':""}</div>
   <div class="fname" aria-label="Pratinjau nama berkas">${r.parts.map((p,i)=>`${i?'<span class="sepc">_</span>':""}<span class="tok ${p.miss?"miss":""} ${p.proj?"proj":""}"><code>${esc(p.value||"…")}</code><small>${esc(p.label)}</small></span>`).join("")}<span class="sepc">.jpg</span></div>
   ${(m.codeProjected||m.repProjected)&&r.ok?`<span class="muted small">Kotak bergaris putus: nomor ditetapkan final oleh server saat foto berhasil disimpan.</span>`:""}
   ${errs.length?`<ul class="errs">${errs.map(e=>`<li>${esc(e)}</li>`).join("")}</ul>`:""}
   <div class="row" style="justify-content:flex-end"><button class="btn" data-act="copyName" ${r.ok?"":"disabled"} data-name="${esc(r.name||"")}">${ICON.copy} Salin nama</button>
-  <button class="btn primary lg" data-act="save" ${r.ok&&d.blob&&!S.busy?"":"disabled"} style="flex:1;max-width:340px">${S.busy?'<span class="spin" style="border-top-color:#fff"></span> Menyimpan…':ICON.check+" Simpan foto"}</button></div>`;
+  <button class="btn primary lg" data-act="save" ${r.ok&&d.blob&&!S.busy&&!cropWait?"":"disabled"} style="flex:1;max-width:340px">${S.busy?'<span class="spin" style="border-top-color:#fff"></span> Menyimpan…':cropWait?'<span class="spin" style="border-top-color:#fff"></span> Memotong objek…':ICON.check+" Simpan foto"}</button></div>`;
   renderSteps();
 }
 function renderRecent(){
@@ -1238,7 +1488,7 @@ function renderRecent(){
 /* camera */
 function camHTML(){
   const c=S.cam,g=selectedGroup();
-  const title=g?`Objek ${g.code} · ulangan ${(g.lastRep||0)+1}`:S.draft.groupChoice==="new"?`Objek baru ${pad4(nextCode(S.groups,S.counter))}`:"Ambil foto";
+  const title=g?`Objek ${g.code} · ulangan ${(g.lastRep||0)+1}`:S.draft.groupChoice==="new"?`Objek baru ${pad4(nextCode(S.groups,S.counter))}`:S.draft.groupChoice==="manual"&&S.draft.manualCode?`Objek baru ${S.draft.manualCode}`:"Ambil foto";
   let mid="";
   if(c.state==="opening")mid=`<div class="msg"><div class="stack" style="align-items:center"><span class="spin" style="width:28px;height:28px;border-width:3px"></span><span>Membuka kamera…</span></div></div>`;
   else if(c.state==="error")mid=`<div class="msg"><div class="stack" style="align-items:center;gap:14px;max-width:420px"><b style="font-size:1.05rem">Kamera langsung tidak dapat dibuka</b><span style="opacity:.85;font-size:.9rem">${esc(c.err)}</span>
@@ -1279,21 +1529,20 @@ async function snap(){
 }
 async function ingest(file,origName){
   try{
-    const cfg=S.project,bmp=await loadBitmap(file),cv=drawScaled(bmp,+cfg.maxDim||0);
-    const blob=await new Promise(r=>cv.toBlob(r,"image/jpeg",+cfg.jpegQuality||0.9));
-    if(!blob)throw new Error("Konversi JPEG gagal.");
-    const flags=[],bs=blurScore(cv);if(bs<45)flags.push("buram");if(Math.min(cv.width,cv.height)<224)flags.push("kecil");
-    const hash=dhash(cv),d=S.draft;if(d.url)URL.revokeObjectURL(d.url);
+    const cfg=S.project,bmp=await loadBitmap(file),src=drawScaled(bmp,+cfg.maxDim||0);
+    const full=await new Promise(r=>src.toBlob(r,"image/jpeg",0.82));
+    if(!full)throw new Error("Konversi JPEG gagal.");
+    const d=S.draft;if(d.srcUrl)URL.revokeObjectURL(d.srcUrl);
     if(!d.groupChoice)d.groupChoice=S.groups.length?null:"new";
-    Object.assign(d,{blob,url:URL.createObjectURL(blob),w:cv.width,h:cv.height,size:blob.size,blur:Math.round(bs),hash,flags,origName,ai:{status:"idle"},similar:null});
-    let best=null;for(const i of S.images){if(!i.hash)continue;const dd=hamming(i.hash,hash);if(dd<=6&&(!best||dd<best.d))best={d:dd,filename:i.filename,code:i.object_code,group_id:i.group_id}}
-    if(best&&best.group_id!==d.groupChoice)d.similar=best;
+    const token={};
+    Object.assign(d,{token,src,srcUrl:URL.createObjectURL(full),srcW:src.width,srcH:src.height,origName,crop:{x:0,y:0,w:1,h:1},cropState:cropOn()?"running":"off",cropInfo:null,cropErr:null,ai:{status:"idle"},similar:null});
+    await encodeDraft(d);
     S.lastSaved=null;renderCaptureParts();
-    if(aiOn()&&!selectedGroup()&&(AI.state==="ready"||AI.state==="cached"||AI.state==="loading"))runAI();
+    if(cropOn())autoCrop();else afterCrop(token);
   }catch(e){toast("Gambar tidak dapat diproses: "+(e.message||e),"bad")}
 }
 async function runAI(){
-  const d=S.draft;if(!d.blob||!aiOn())return;
+  const d=S.draft;if(!d.blob||!aiOn()||d.cropState==="running")return;
   const token=d.blob;d.ai={status:"running"};renderCategory();
   try{
     const r=await aiClassify(d.blob);if(S.draft.blob!==token)return;
@@ -1308,18 +1557,23 @@ async function saveDraft(){
   if(S.busy)return;
   const d=S.draft,s=S.session,m=draftMeta(),pre=buildFilename(m,{categories:S.project.categories,lightings:lightsOf()});
   if(!d.blob||!pre.ok){renderSavebar();return toast("Lengkapi data yang ditandai merah sebelum menyimpan.","bad")}
+  if(d.cropState==="running"||d.cropBusy)return toast("Tunggu sampai pemotongan foto selesai.");
   S.busy=true;renderSavebar();
-  const isNew=d.groupChoice==="new",ai=d.ai.status==="done"?d.ai:null,now=new Date().toISOString();
+  const isNew=d.groupChoice==="new"||d.groupChoice==="manual",ai=d.ai.status==="done"?d.ai:null,now=new Date().toISOString();
   const row={id:uid(),category_predicted:ai?ai.category:null,ai_confidence:ai?Math.round(ai.confidence*1000)/1000:null,ai_alternatives:ai?ai.alternatives:[],ai_reason:ai?ai.reason:null,ai_model:ai?ai.model:null,ai_ms:ai?ai.ms:null,ai_knn_refs:ai?ai.knnRefs:null,emb:ai?ai.emb:null,emb_scale:ai?ai.embScale:null,emb_v:ai?AI_CFG.version:null,ai_status:d.ai.status==="error"?"gagal":ai?"selesai":"tidak dijalankan",
     category_source:!isNew?"objek":ai&&ai.category===m.category&&!ai.lowConf?"ai_dikonfirmasi":ai?"koreksi_manual":"manual",
-    captured_at:now,width:d.w,height:d.h,size_bytes:d.size,blur_score:d.blur,quality_flags:d.flags,hash:d.hash,original_name:d.origName||null,note:(d.note||"").trim(),label_updated_at:null};
+    captured_at:now,width:d.w,height:d.h,size_bytes:d.size,blur_score:d.blur,quality_flags:d.flags,hash:d.hash,original_name:d.origName||null,note:(d.note||"").trim(),label_updated_at:null,
+    crop_source:{auto:"otomatis",manual:"manual",unsure:"penuh (otomatis ragu)",fills:"penuh (objek memenuhi foto)",full:"penuh",off:"penuh",nomodel:"penuh",error:"penuh"}[d.cropState]||"penuh",
+    crop_box:isFullBox(d.crop)?null:{x:+d.crop.x.toFixed(4),y:+d.crop.y.toFixed(4),w:+d.crop.w.toFixed(4),h:+d.crop.h.toFixed(4)},source_width:d.srcW,source_height:d.srcH,
+    id_source:d.groupChoice==="manual"?"manual":d.groupChoice==="new"?"otomatis":"objek"};
+  if(row.crop_box&&row.crop_source==="penuh")row.crop_source="manual";
   try{
-    const saved=await S.store.saveImage({pid:S.pid,groupId:isNew?null:d.groupChoice,category:isNew?m.category:null,location:m.location,lighting:m.lighting,date:m.date,blob:d.blob,row});
+    const saved=await S.store.saveImage({pid:S.pid,groupId:isNew?null:d.groupChoice,code:d.groupChoice==="manual"?d.manualCode:null,category:isNew?m.category:null,location:m.location,lighting:m.lighting,date:m.date,blob:d.blob,row});
     S.lastSaved=saved;S.recent.unshift(saved);S.store.patchImage(saved);
     const gsel=S.groups.find(g=>g.id===saved.group_id);if(gsel)gsel.lastRep=Math.max(gsel.lastRep||0,saved.repetition_number);
     else S.groups.push({id:saved.group_id,code:saved.group_id,category:saved.category_confirmed,lastRep:saved.repetition_number,createdAt:now,updatedAt:now});
     if(isNew)S.counter=Math.max(S.counter,+saved.group_id);
-    if(d.url)URL.revokeObjectURL(d.url);
+    freeDraft(d);
     S.draft=newDraft(null);
     toast("Tersimpan: "+saved.filename,"ok");
   }catch(e){toast("Gagal menyimpan: "+errMsg(e)+" Foto belum tersimpan dan tidak ada nomor yang terpakai.","bad")}
@@ -1329,8 +1583,14 @@ async function saveDraft(){
 /* ---------- gallery ---------- */
 function filteredImages(){
   const f=S.gf,q=f.q.trim().toLowerCase();
-  return S.images.filter(i=>(!q||(i.filename||"").toLowerCase().includes(q)||(i.note||"").toLowerCase().includes(q))&&(!f.cat||i.category_confirmed===f.cat)&&(!f.loc||i.location===f.loc)&&(!f.ph||i.photographer_code===f.ph)&&(!f.date||i.capture_date===isoToYmd(f.date))&&(!f.code||i.object_code===pad4(f.code.replace(/\D/g,"")||"0"))&&(!f.status||(f.status==="pending"?i.verification_status!=="verified":i.verification_status===f.status)))
+  return S.images.filter(i=>(!q||(i.filename||"").toLowerCase().includes(q)||(i.note||"").toLowerCase().includes(q))&&(!f.cat||i.category_confirmed===f.cat)&&(!f.loc||i.location===f.loc)&&(!f.ph||i.photographer_code===f.ph)&&(!f.date||i.capture_date===isoToYmd(f.date))&&(!f.code||i.object_code===pad4(f.code.replace(/\D/g,"")||"0"))&&(!f.status||statusMatch(i,f.status)))
     .sort((a,b)=>(b.created_at||"")>(a.created_at||"")?1:-1);
+}
+function statusMatch(i,st){
+  if(st==="pending")return i.verification_status!=="verified";
+  if(st==="rf_wait")return i.verification_status==="verified"&&!["done","duplicate"].includes(i.roboflow_status);
+  if(st==="rf_error")return i.roboflow_status==="error";
+  return i.verification_status===st;
 }
 function viewGallery(){
   const cfg=S.project,f=S.gf,list=filteredImages();
@@ -1344,12 +1604,12 @@ function viewGallery(){
     <select id="gf-cat" aria-label="Kategori"><option value="">Semua kategori</option>${opt((cfg.categories||[]).map(c=>[c.code,c.name]),f.cat)}</select>
     <select id="gf-loc" aria-label="Lokasi"><option value="">Semua lokasi</option>${opt(locs.map(l=>[l,l]),f.loc)}</select>
     <select id="gf-ph" aria-label="Fotografer"><option value="">Semua fotografer</option>${opt(phs.map(p=>[p,p+(nameOfCode(p)?" · "+nameOfCode(p):"")]),f.ph)}</select>
-    <select id="gf-status" aria-label="Status"><option value="">Semua status</option>${opt([["pending","Belum diverifikasi"],["verified","Terverifikasi"],["flagged","Perlu dicek"]],f.status)}</select>
+    <select id="gf-status" aria-label="Status"><option value="">Semua status</option>${opt([["pending","Belum diverifikasi"],["verified","Terverifikasi"],["flagged","Perlu dicek"],...(rfEnabled()?[["rf_wait","Terverifikasi, belum di Roboflow"],["rf_error","Gagal ke Roboflow"]]:[])],f.status)}</select>
     <input type="text" id="gf-code" inputmode="numeric" placeholder="ID objek" value="${esc(f.code)}" aria-label="ID objek">
   </div>
   <div class="row" style="justify-content:space-between">
     <div class="row"><input type="date" id="gf-date" value="${esc(f.date)}" aria-label="Tanggal" style="width:auto">${active?'<button class="btn sm ghost" data-act="gfreset">Hapus filter</button>':""}</div>
-    <div class="row">${can("pemeriksa")&&pendingShown?`<button class="btn sm" data-act="bulkVerify">${ICON.check} Verifikasi ${pendingShown} foto</button>`:""}
+    <div class="row">${can("anggota")&&pendingShown?`<button class="btn sm" data-act="bulkVerify">${ICON.check} Verifikasi ${pendingShown} foto</button>`:""}
     <div class="seg inline" role="group" aria-label="Tampilan"><button data-act="galView" data-v="grid" aria-pressed="${S.galView==="grid"}">Grid</button><button data-act="galView" data-v="table" aria-pressed="${S.galView==="table"}">Tabel</button></div></div>
   </div><div id="bulkConfirm"></div></section>
   ${!list.length?`<div class="empty-state"><div class="ic">${ICON.img}</div><h2>${S.images.length?"Tidak ada foto yang cocok":"Galeri masih kosong"}</h2><p>${S.images.length?"Ubah atau hapus filter untuk melihat foto lain.":"Foto yang disimpan akan muncul di sini beserta metadatanya."}</p>${S.images.length?"":`<a class="btn primary" href="#ambil">${ICON.cam} Ambil foto</a>`}</div>`:
@@ -1357,8 +1617,14 @@ function viewGallery(){
   `<section class="card" style="padding:0"><div class="tscroll"><table class="t"><thead><tr><th>Nama berkas</th><th>Kategori</th><th>Saran AI</th><th>ID</th><th>Lokasi</th><th>Cahaya</th><th>Fotografer</th><th>Tanggal</th><th>Status</th></tr></thead><tbody>
   ${list.slice(0,1000).map(i=>`<tr class="click" data-act="open" data-v="${esc(i.id)}"><td class="mono" style="font-size:.74rem;white-space:nowrap">${esc(i.filename)}</td><td>${esc(catName(i.category_confirmed))}</td><td>${i.category_predicted?esc(i.category_predicted)+" "+Math.round((i.ai_confidence||0)*100)+"%":"–"}</td><td class="mono">${esc(i.object_code)}</td><td>${esc(i.location)}</td><td>${esc(i.lighting)}</td><td>${esc(i.photographer_code)}</td><td>${esc(fmtYmd(i.capture_date))}</td><td>${statusChip(i)}</td></tr>`).join("")}</tbody></table></div></section>`}`;
 }
+function rfChip(i,short){
+  const s=i.roboflow_status;if(!s)return "";
+  if(s==="done"||s==="duplicate")return `<span class="chip rf" title="${s==="duplicate"?"Sudah ada di Roboflow":"Terkirim ke Roboflow"}">${short?"RF":"Roboflow ✓"}</span>`;
+  if(s==="error")return `<span class="chip bad" title="${esc(i.roboflow_error||"")}">${short?"RF!":"Roboflow gagal"}</span>`;
+  return "";
+}
 function statusChip(i){return i.verification_status==="verified"?'<span class="chip ok">Terverifikasi</span>':i.verification_status==="flagged"?'<span class="chip bad">Perlu dicek</span>':'<span class="chip">Belum</span>'}
-function tile(i){const c=i.category_confirmed;return `<button class="tile ${clsOf(c)}" style="${clsStyle(c)}" data-act="open" data-v="${esc(i.id)}"><div class="th"><img data-blob="${esc(i.asset_id)}" alt="" loading="lazy"><span class="chip">${esc(catName(c))} · ${esc(i.object_code)}</span><span class="st">${i.verification_status==="verified"?'<span class="chip ok">✓</span>':i.verification_status==="flagged"?'<span class="chip bad">!</span>':""}</span></div><div class="meta"><code>${esc(i.filename)}</code></div></button>`}
+function tile(i){const c=i.category_confirmed;return `<button class="tile ${clsOf(c)}" style="${clsStyle(c)}" data-act="open" data-v="${esc(i.id)}"><div class="th"><img data-blob="${esc(i.asset_id)}" alt="" loading="lazy"><span class="chip">${esc(catName(c))} · ${esc(i.object_code)}</span><span class="st">${rfChip(i,true)}${i.verification_status==="verified"?'<span class="chip ok">✓</span>':i.verification_status==="flagged"?'<span class="chip bad">!</span>':""}</span></div><div class="meta"><code>${esc(i.filename)}</code></div></button>`}
 function hydrate(root){
   if(!S.store)return;
   for(const im of (root||document).querySelectorAll("img[data-blob]:not([src])")){const id=im.dataset.blob;if(!id)continue;S.store.url(id).then(u=>{im.src=u}).catch(()=>{im.alt="Foto tidak tersedia"})}
@@ -1373,7 +1639,8 @@ function renderModal(){
   const list=filteredImages(),idx=list.findIndex(x=>x.id===i.id),cats=(S.project.categories||[]).filter(c=>c.active!==false);
   const kv=[["Kategori final",catName(i.category_confirmed)],["Sumber label",i.category_source||"–"],["Saran AI",i.category_predicted?`${catName(i.category_predicted)} (${Math.round((i.ai_confidence||0)*100)}%)`:i.ai_status||"–"],["Alternatif AI",(i.ai_alternatives||[]).map(a=>`${a.category} ${Math.round(a.confidence*100)}%`).join(", ")||"–"],
     ["ID objek",i.object_code],["Ulangan",i.repetition_number],["Lokasi",i.location],["Cahaya",i.lighting],["Fotografer",`${i.photographer_code}${nameOfCode(i.photographer_code)?" · "+nameOfCode(i.photographer_code):""}`],["Tanggal",fmtYmd(i.capture_date)],["Disimpan",fmtDate(i.created_at)],
-    ["Resolusi",`${i.width}×${i.height} px · ${Math.round((i.size_bytes||0)/1024)} KB`],["Ketajaman",i.blur_score!=null?i.blur_score+((i.quality_flags||[]).includes("buram")?" (mungkin buram)":""):"–"],["Waktu AI",i.ai_ms!=null?i.ai_ms+" ms":"–"],["Diverifikasi",i.reviewed_by?`${i.reviewed_by} · ${fmtDate(i.reviewed_at)}`:"–"],["Catatan",i.note||"–"]];
+    ["Resolusi",`${i.width}×${i.height} px · ${Math.round((i.size_bytes||0)/1024)} KB`],["Ketajaman",i.blur_score!=null?i.blur_score+((i.quality_flags||[]).includes("buram")?" (mungkin buram)":""):"–"],["Waktu AI",i.ai_ms!=null?i.ai_ms+" ms":"–"],["Diverifikasi",i.reviewed_by?`${i.reviewed_by} · ${fmtDate(i.reviewed_at)}`:"–"],
+    ["Potong",i.crop_source?`${i.crop_source}${i.source_width?` · dari ${i.source_width}×${i.source_height} px`:""}`:"–"],["Sumber ID",i.id_source||"–"],["Catatan",i.note||"–"]];
   $("#modalroot").innerHTML=`<div class="modal" data-act="modalBg"><div class="sheet" role="dialog" aria-modal="true" aria-label="Detail foto">
     <div class="pic"><img data-blob="${esc(i.asset_id)}" alt="${esc(i.filename)}"></div>
     <div class="side2">
@@ -1382,10 +1649,13 @@ function renderModal(){
       <div class="fname-plain">${esc(i.filename)}</div>
       <div class="stack" style="gap:6px"><span class="eyebrow">Objek ${esc(i.object_code)} · ${sibs.length} foto</span>
       <div class="grpstrip">${sibs.map(x=>`<button data-act="open" data-v="${esc(x.id)}" aria-current="${x.id===i.id}" aria-label="Ulangan ${x.repetition_number}"><img data-blob="${esc(x.asset_id)}" alt=""><span>${x.repetition_number}</span></button>`).join("")}</div></div>
-      ${can("pemeriksa")?`<div class="row" style="gap:6px">
+      ${can("anggota")?`<div class="row" style="gap:6px">
         ${i.verification_status!=="verified"?`<button class="btn sm primary" data-act="setStatus" data-v="verified">${ICON.check} Verifikasi</button>`:`<button class="btn sm" data-act="setStatus" data-v="pending">Batalkan verifikasi</button>`}
         ${i.verification_status!=="flagged"?`<button class="btn sm" data-act="setStatus" data-v="flagged">Tandai perlu dicek</button>`:""}
-        <button class="btn sm" data-act="editCat">Koreksi kategori</button><button class="btn sm danger" data-act="askDel">Hapus</button></div>`:""}
+        <button class="btn sm" data-act="editCat">Koreksi kategori</button>${can("admin")?`<button class="btn sm danger" data-act="askDel">Hapus</button>`:""}</div>`:""}
+      ${rfEnabled()&&i.verification_status==="verified"?`<div class="note ${i.roboflow_status==="error"?"bad":i.roboflow_status?"ok":""} row" style="justify-content:space-between;gap:8px;font-size:.84rem">
+        <span>${i.roboflow_status==="done"?`Terkirim ke Roboflow · ${esc(fmtDate(i.roboflow_at))}`:i.roboflow_status==="duplicate"?"Sudah ada di Roboflow (foto identik)":i.roboflow_status==="error"?`Gagal dikirim ke Roboflow: ${esc(i.roboflow_error||"")}`:"Belum terkirim ke Roboflow."}</span>
+        ${i.roboflow_status==="done"||i.roboflow_status==="duplicate"?"":`<button class="btn sm" data-act="rfOne" ${S.rfBusy?"disabled":""}>${S.rfBusy?'<span class="spin" style="width:12px;height:12px"></span> Mengirim…':"Kirim ke Roboflow"}</button>`}</div>`:""}
       ${m.editCat&&g?`<div class="note stack" style="gap:8px"><b>Ubah kategori objek ${esc(g.code)}</b><span>Semua ${sibs.length} foto objek ini berganti kategori dan nama berkasnya disusun ulang. Saran AI awal tetap tersimpan.</span>
         <div class="clsgrid">${cats.map(c=>`<button class="clsbtn ${clsOf(c.code)}" style="${clsStyle(c.code)}min-height:46px" data-act="applyCat" data-v="${esc(c.code)}" aria-pressed="${g.category===c.code}"><b><i></i>${esc(c.name)}</b></button>`).join("")}</div><button class="btn sm ghost" data-act="editCat" style="align-self:flex-start">Batal</button></div>`:""}
       ${m.confirmDel?`<div class="note bad stack" style="gap:8px"><b>Hapus foto ini permanen?</b><span>Berkas dan metadatanya dihapus. Nomor ulangan ${i.repetition_number} tidak dipakai ulang.</span><div class="row"><button class="btn sm danger solid" data-act="doDel">Ya, hapus</button><button class="btn sm" data-act="askDel">Batal</button></div></div>`:""}
@@ -1393,7 +1663,35 @@ function renderModal(){
     </div></div></div>`;
   hydrate($("#modalroot"));
 }
-async function setStatus(ids,status){try{await S.store.setStatus(S.pid,ids,status);toast(ids.length>1?`${ids.length} foto diperbarui.`:"Status diperbarui.","ok")}catch(e){toast("Gagal memperbarui status: "+errMsg(e),"bad")}}
+async function setStatus(ids,status){
+  try{await S.store.setStatus(S.pid,ids,status);toast(ids.length>1?`${ids.length} foto diperbarui.`:status==="verified"?"Foto diverifikasi.":"Status diperbarui.","ok")}
+  catch(e){toast("Gagal memperbarui status: "+errMsg(e),"bad");return}
+  if(status==="verified"&&rfEnabled())syncRoboflow(ids);
+}
+function rfEnabled(){const r=S.project&&S.project.roboflow;return !!(r&&r.enabled&&r.project)}
+/* Send verified photos to the team's Roboflow project through the roboflow-sync Edge Function (API key stays on the server). */
+async function syncRoboflow(ids){
+  if(!rfEnabled()||!S.store)return;
+  if(S.rfBusy){S.rfQueue=[...(S.rfQueue||[]),...(ids||[])];return}
+  const pid=S.pid;let sent=0,dup=0,failed=0,err=null,lastFail=null;S.rfBusy=true;rfRefreshUI();
+  try{
+    const batches=[];if(ids)for(let i=0;i<ids.length;i+=20)batches.push(ids.slice(i,i+20));
+    for(let round=0;round<(ids?batches.length:50);round++){
+      const r=await S.store.roboflowSync(pid,ids?batches[round]:null);
+      sent+=r.sent||0;dup+=r.duplicate||0;failed+=r.failed||0;
+      const f=(r.results||[]).find(x=>x.status==="error");if(f)lastFail=f.error;
+      if(!ids&&!(r.remaining>0))break;
+      if(!ids&&!(r.results||[]).some(x=>x.status!=="error"))break;
+    }
+  }catch(e){err=e.message||String(e)}
+  S.rfBusy=false;S.store.refresh("images",pid);
+  if(err)toast("Roboflow: "+err,"bad");
+  else if(failed)toast(`Roboflow: ${sent} terkirim, ${failed} gagal. ${lastFail||""}`,"bad");
+  else if(sent||dup)toast(`Terkirim ke Roboflow: ${sent} foto${dup?`, ${dup} sudah ada`:""}.`,"ok");
+  else if(!ids)toast("Tidak ada foto terverifikasi yang perlu dikirim.");
+  const q=S.rfQueue;S.rfQueue=null;if(q&&q.length)syncRoboflow(q);else rfRefreshUI();
+}
+function rfRefreshUI(){if(S.modal)renderModal();if(S.route==="atur"&&S.sub==="proyek"){const el=$("#rf-card");if(el)el.outerHTML=rfCard()}}
 async function changeGroupCategory(gid,cat){
   const g=S.groups.find(x=>x.id===gid);if(!g||g.category===cat){if(S.modal){S.modal.editCat=false;renderModal()}return}
   try{await S.store.relabelGroup(S.pid,gid,cat);toast(`Objek ${g.code} kini berkategori ${catName(cat)}.`,"ok")}catch(e){toast("Koreksi gagal: "+errMsg(e),"bad")}
@@ -1536,21 +1834,50 @@ function settingsProject(){
     <section class="card"><h2>Gambar</h2>
       <div class="grid2" style="gap:10px"><label class="field">Kualitas JPEG<select id="p-q">${[[0.8,"80%"],[0.85,"85%"],[0.9,"90% (disarankan)"],[0.95,"95%"]].map(([v,l])=>`<option value="${v}" ${+c.jpegQuality===v?"selected":""}>${l}</option>`).join("")}</select></label>
       <label class="field">Sisi terpanjang<select id="p-dim">${[[1024,"1024 px"],[1600,"1600 px (disarankan)"],[2048,"2048 px"],[0,"Ukuran asli"]].map(([v,l])=>`<option value="${v}" ${+c.maxDim===v?"selected":""}>${l}</option>`).join("")}</select></label></div>
-      <p class="muted small">Foto 1600 px berukuran ±300–500 KB. Paket gratis Supabase (1 GB) cukup untuk ±2.000–3.000 foto.</p>
+      <label class="field">Potong objek<select id="p-crop"><option value="1" ${c.autoCrop!==false?"selected":""}>Otomatis (disarankan)</option><option value="0" ${c.autoCrop===false?"selected":""}>Manual — foto penuh</option></select></label>
+      <p class="muted small">Potong otomatis menyimpan hanya objeknya; anggota tetap bisa menggeser kotak. Paket gratis Supabase (1 GB) cukup untuk ±3.000–5.000 foto terpotong.</p>
       <hr class="sep"><h2>Kondisi cahaya</h2>
       <div class="taglist">${lightsOf().map((l,ix)=>`<span class="tag"><code>${esc(l.code)}</code> ${esc(l.label)}${S.images.some(i=>i.lighting===l.code)||lightsOf().length<2?"":`<button data-act="rmLight" data-v="${ix}" aria-label="Hapus ${esc(l.code)}">×</button>`}</span>`).join("")}</div>
       <div class="addrow"><input type="text" id="n-light-code" placeholder="kode, mis. low"><input type="text" id="n-light-label" placeholder="keterangan, mis. cahaya redup"><button class="btn" data-act="addLight">Tambah</button></div></section>
   </div>
-  <section class="card"><div class="card-h"><h2>Kategori objek</h2><span class="muted small">Kode menjadi awalan nama berkas. Deskripsi membantu pengumpul.</span></div>
+  <section class="card"><div class="card-h"><h2>Kategori objek</h2><span class="muted small">Kode menjadi awalan nama berkas. Deskripsi membantu anggota memilih kategori.</span></div>
     <div>${(c.categories||[]).map((k,ix)=>{const used=S.images.some(i=>i.category_confirmed===k.code);return `<div class="catrow ${clsOf(k.code)}" style="${clsStyle(k.code)}"><i></i><code class="mono">${esc(k.code)}</code><input class="cr-name" type="text" data-cat="${ix}" data-k="name" value="${esc(k.name)}" aria-label="Nama ${esc(k.code)}"><input class="cr-desc" type="text" data-cat="${ix}" data-k="desc" value="${esc(k.desc||"")}" aria-label="Deskripsi ${esc(k.code)}"><label class="row small" style="gap:5px"><input type="checkbox" data-catact="${ix}" ${k.active!==false?"checked":""}> aktif</label>${used?'<span class="muted small">dipakai</span>':`<button class="btn sm ghost" data-act="rmCat" data-v="${ix}" aria-label="Hapus ${esc(k.code)}">${ICON.x}</button>`}</div>`}).join("")}</div>
     <div class="addrow"><label class="field">Kode baru<input type="text" id="n-cat-code" placeholder="mis. kaca"></label><label class="field">Nama tampilan<input type="text" id="n-cat-name" placeholder="mis. Kaca"></label><button class="btn" data-act="addCat">${ICON.plus} Tambah kategori</button></div>
   </section>
+  <div class="grid2" style="align-items:start">${membersCard()}${rfCard()}</div>
   <section class="card"><h2>Proyek lain</h2>
     <form id="f-newproj" class="addrow" style="grid-template-columns:minmax(0,1fr) auto"><label class="field">Nama proyek baru<input type="text" id="np-name" placeholder="mis. Dataset Sampah Gedung B"></label><button class="btn" type="submit">${ICON.plus} Buat proyek</button></form>
     <hr class="sep">
     <div class="row"><button class="btn danger" data-act="askDelProject">Hapus proyek “${esc(c.name)}”</button></div><div id="delProject"></div>
   </section>`;
 }
+function membersOf(pid){return new Set(S.members.filter(m=>m.project_id===pid).map(m=>m.user_id))}
+function projectsOf(uid){return S.members.filter(m=>m.user_id===uid).map(m=>m.project_id)}
+function membersCard(){
+  const mem=membersOf(S.pid),anggota=S.profiles.filter(u=>u.role!=="admin"),admins=S.profiles.filter(u=>u.role==="admin");
+  return `<section class="card" id="mem-card"><div class="card-h"><h2>Anggota proyek</h2><span class="muted small">${anggota.filter(u=>mem.has(u.user_id)).length} anggota</span></div>
+    <p class="muted small">Hanya anggota yang dicentang yang bisa membuka proyek ini, melihat fotonya, mengambil foto, dan memverifikasi. Admin selalu bisa membuka semua proyek.</p>
+    ${anggota.length?`<div class="checks">${anggota.map(u=>`<label class="check ${u.active?"":"off"}"><input type="checkbox" data-member="${esc(u.user_id)}" ${mem.has(u.user_id)?"checked":""}><span class="avatar sm">${esc(initials(u))}</span><span class="who"><b>${esc(u.full_name||u.username)}</b><span>@${esc(u.username)} · <span class="mono">${esc(u.photographer_code)}</span>${u.active?"":" · nonaktif"}</span></span></label>`).join("")}</div>`:`<p class="note">Belum ada akun anggota. Tambahkan di tab <b>Pengguna</b>.</p>`}
+    ${admins.length?`<p class="muted small">Admin: ${admins.map(u=>esc(u.full_name||u.username)).join(", ")}</p>`:""}</section>`;
+}
+function rfCard(){
+  if(!S.project)return "";
+  const r=S.project.roboflow||{},k=S.rfKey[S.pid];
+  const waiting=S.images.filter(i=>i.verification_status==="verified"&&!["done","duplicate"].includes(i.roboflow_status)).length;
+  const done=S.images.filter(i=>["done","duplicate"].includes(i.roboflow_status)).length,errs=S.images.filter(i=>i.roboflow_status==="error").length;
+  return `<section class="card" id="rf-card"><div class="card-h"><h2>Kirim ke Roboflow</h2>${r.enabled&&r.project?'<span class="chip ok">Aktif</span>':'<span class="chip">Mati</span>'}</div>
+    <p class="muted small">Saat anggota menekan <b>Verifikasi</b>, foto (yang sudah dipotong) dan nama berkasnya otomatis diunggah ke proyek Roboflow tim.</p>
+    <label class="row small" style="font-weight:650"><input type="checkbox" id="rf-enabled" ${r.enabled?"checked":""}> Kirim otomatis setelah verifikasi</label>
+    <label class="field">Proyek Roboflow<input type="text" id="rf-project" value="${esc(r.project||"")}" placeholder="mis. sampah-kampus" autocapitalize="none" spellcheck="false"><span class="hint">Slug proyek, atau tempel tautan proyek dari app.roboflow.com.</span></label>
+    <div class="grid2" style="gap:10px"><label class="field">Split<select id="rf-split">${[["auto","Per objek 70/20/10"],["train","Semua ke train"],["valid","Semua ke valid"],["test","Semua ke test"]].map(([v,l])=>`<option value="${v}" ${(r.split||"auto")===v?"selected":""}>${l}</option>`).join("")}</select></label>
+      <label class="field">Nama batch<input type="text" id="rf-batch" value="${esc(r.batch||"")}" placeholder="mis. dataset-collector"></label></div>
+    <label class="field">Private API Key<div class="row" style="flex-wrap:nowrap"><input type="password" id="rf-key" autocomplete="off" placeholder="${k===true?"tersimpan — isi untuk mengganti":"tempel Private API Key"}"><button class="btn" type="button" data-act="rfSaveKey">Simpan kunci</button></div>
+      <span class="hint">${k===true?'<b style="color:var(--ok)">Kunci tersimpan di server.</b> ':k===false?'<b style="color:var(--bad)">Belum ada kunci.</b> ':""}Ambil di Roboflow → Settings → API Keys. Kunci disimpan di Supabase dan tidak pernah dikirim ke browser anggota.</span></label>
+    <div class="row"><button class="btn" data-act="rfAll" ${waiting&&r.enabled&&r.project&&!S.rfBusy?"":"disabled"}>${S.rfBusy?'<span class="spin" style="width:13px;height:13px"></span> Mengirim…':`Kirim ${fmtInt(waiting)} foto terverifikasi yang belum terkirim`}</button><span class="muted small">${fmtInt(done)} foto sudah di Roboflow${errs?` · <span style="color:var(--bad)">${errs} gagal</span>`:""}</span></div>
+    <p class="note" style="font-size:.8rem">Membutuhkan Edge Function <span class="mono">roboflow-sync</span> di Supabase (dipasang sekali, lihat README). Split otomatis menaruh semua foto dari satu ID objek di split yang sama. Membatalkan verifikasi tidak menghapus foto dari Roboflow.</p></section>`;
+}
+function rfSlug(s){const t=String(s||"").trim().replace(/^https?:\/\/[^/]+\//,"").replace(/[?#].*$/,"");const p=t.split("/").filter(Boolean);const sl=p.length>=2?p[1]:p[0]||"";return /^[a-z0-9][a-z0-9._-]*$/i.test(sl)?sl.toLowerCase():""}
+async function loadRfKey(){const pid=S.pid;if(!pid||!can("admin")||S.rfKey[pid]!==undefined)return;S.rfKey[pid]=null;try{S.rfKey[pid]=await S.store.hasRoboflowKey(pid)}catch{S.rfKey[pid]=undefined;return}rfRefreshUI()}
 function settingsUsers(){
   const users=S.profiles,codes=users.map(u=>u.photographer_code);
   const cred=S.newCred;
@@ -1561,7 +1888,8 @@ function settingsUsers(){
       <label class="field">Nama lengkap<input type="text" id="nu-name" required placeholder="mis. Budi Santoso"></label>
       <div class="grid2" style="gap:10px"><label class="field">Username<input type="text" id="nu-user" required autocapitalize="none" spellcheck="false" placeholder="mis. budi.santoso"></label>
       <label class="field">Kode fotografer<input type="text" id="nu-code" required value="${esc(nextPhotographerCode(codes))}" style="text-transform:uppercase;font-family:var(--f-mono)"></label></div>
-      <div class="field"><span>Peran</span><div class="seg" role="group" id="nu-role">${["pengumpul","pemeriksa","admin"].map((r,i)=>`<button type="button" data-act="nuRole" data-v="${r}" aria-pressed="${(S.nuRole||"pengumpul")===r}">${ROLE_LABEL[r]}</button>`).join("")}</div><span class="hint">${esc(ROLE_DESC[S.nuRole||"pengumpul"])}</span></div>
+      <div class="field"><span>Peran</span><div class="seg" role="group" id="nu-role">${["anggota","admin"].map(r=>`<button type="button" data-act="nuRole" data-v="${r}" aria-pressed="${(S.nuRole||"anggota")===r}">${ROLE_LABEL[r]}</button>`).join("")}</div><span class="hint">${esc(ROLE_DESC[S.nuRole||"anggota"])}</span></div>
+      ${(S.nuRole||"anggota")==="anggota"?`<div class="field"><span>Akses proyek</span>${S.projects.length?`<div class="checks compact">${S.projects.map(p=>`<label class="check"><input type="checkbox" class="nu-proj" value="${esc(p.id)}" ${(S.nuProjects||[S.pid]).includes(p.id)?"checked":""}><span>${esc(p.name)}</span></label>`).join("")}</div>`:`<span class="hint">Belum ada proyek.</span>`}<span class="hint">Anggota hanya bisa membuka proyek yang dicentang.</span></div>`:""}
       <label class="field">Kata sandi awal<div class="row" style="flex-wrap:nowrap"><input type="text" id="nu-pass" required minlength="8" value="${esc(S.nuPass||genPassword())}" style="font-family:var(--f-mono)"><button class="btn" type="button" data-act="genPw" aria-label="Buat kata sandi acak">${ICON.redo}</button></div><span class="hint">Minimal 8 karakter. Pengguna bisa menggantinya sendiri di Akun saya.</span></label>
       <button class="btn primary" type="submit" ${S.busy?"disabled":""}>${ICON.plus} Buat akun</button>
     </form></section>
@@ -1569,15 +1897,17 @@ function settingsUsers(){
     <div class="users">${users.map(userRow).join("")}</div></section></div>`;
 }
 function genPassword(){const a="abcdefghjkmnpqrstuvwxyz23456789";let s="";const r=new Uint32Array(10);crypto.getRandomValues(r);for(const x of r)s+=a[x%a.length];S.nuPass=s.slice(0,5)+"-"+s.slice(5);return S.nuPass}
-function credText(c){return `Dataset Collector\nAlamat  : ${location.origin+location.pathname}\nUsername: ${c.username}\nSandi   : ${c.password}\nPeran   : ${ROLE_LABEL[c.role]}`}
+function credText(c){const ps=(c.projects||[]).map(id=>(S.projects.find(p=>p.id===id)||{}).name).filter(Boolean);return `Dataset Collector\nAlamat  : ${location.origin+location.pathname}\nUsername: ${c.username}\nSandi   : ${c.password}\nPeran   : ${ROLE_LABEL[c.role]||c.role}${c.role!=="admin"&&ps.length?`\nProyek  : ${ps.join(", ")}`:""}`}
 function userRow(u){
   const me=u.user_id===S.user.id,ed=S.editUser===u.user_id,pw=S.pwUser===u.user_id,del=S.delUser===u.user_id;
   return `<div class="user ${u.active?"":"off"}"><span class="avatar">${esc(initials(u))}</span>
-    <div class="who"><b>${esc(u.full_name||u.username)}${me?' <span class="chip acc">Anda</span>':""}</b><span>@${esc(u.username)} · <span class="mono">${esc(u.photographer_code)}</span> · ${esc(ROLE_LABEL[u.role])}${u.active?"":" · nonaktif"}</span></div>
+    <div class="who"><b>${esc(u.full_name||u.username)}${me?' <span class="chip acc">Anda</span>':""}</b><span>@${esc(u.username)} · <span class="mono">${esc(u.photographer_code)}</span> · ${esc(ROLE_LABEL[u.role]||u.role)}${u.active?"":" · nonaktif"}</span>
+      <span class="projs">${u.role==="admin"?"Semua proyek":(()=>{const ps=projectsOf(u.user_id).map(id=>S.projects.find(p=>p.id===id)).filter(Boolean);return ps.length?"Proyek: "+ps.map(p=>esc(p.name)).join(", "):'<span style="color:var(--warn-ink,#8a5a00)">Belum punya akses proyek</span>'})()}</span></div>
     <div class="acts"><button class="btn sm" data-act="editUser" data-v="${esc(u.user_id)}">Ubah</button><button class="btn sm ghost" data-act="pwUser" data-v="${esc(u.user_id)}">${ICON.key} Sandi</button>${me?"":`<button class="btn sm ghost danger" data-act="delUser" data-v="${esc(u.user_id)}">Hapus</button>`}</div>
     ${ed?`<div class="edit"><label class="field">Nama<input type="text" id="eu-name" value="${esc(u.full_name)}"></label><label class="field">Kode fotografer<input type="text" id="eu-code" value="${esc(u.photographer_code)}" style="text-transform:uppercase;font-family:var(--f-mono)"></label>
-      <label class="field">Peran<select id="eu-role" ${me?"disabled":""}>${["pengumpul","pemeriksa","admin"].map(r=>`<option value="${r}" ${u.role===r?"selected":""}>${ROLE_LABEL[r]}</option>`).join("")}</select></label>
+      <label class="field">Peran<select id="eu-role" ${me?"disabled":""}>${["anggota","admin"].map(r=>`<option value="${r}" ${u.role===r?"selected":""}>${ROLE_LABEL[r]}</option>`).join("")}</select></label>
       <label class="field">Status<select id="eu-active" ${me?"disabled":""}><option value="1" ${u.active?"selected":""}>Aktif</option><option value="0" ${u.active?"":"selected"}>Nonaktif</option></select></label>
+      ${u.role!=="admin"&&S.projects.length?`<div class="field" style="grid-column:1/-1"><span>Akses proyek</span><div class="checks compact">${S.projects.map(p=>`<label class="check"><input type="checkbox" class="eu-proj" value="${esc(p.id)}" ${projectsOf(u.user_id).includes(p.id)?"checked":""}><span>${esc(p.name)}</span></label>`).join("")}</div></div>`:""}
       <div class="row" style="grid-column:1/-1"><button class="btn sm primary" data-act="saveUser" data-v="${esc(u.user_id)}">Simpan</button><button class="btn sm ghost" data-act="editUser" data-v="">Batal</button><span class="muted small">Mengganti kode fotografer tidak mengubah nama berkas foto lama.</span></div></div>`:""}
     ${pw?`<div class="edit" style="grid-template-columns:minmax(0,1fr) auto"><label class="field">Kata sandi baru untuk ${esc(u.username)}<input type="text" id="pu-pass" minlength="8" value="${esc(genPassword())}" style="font-family:var(--f-mono)"></label><div class="row" style="align-self:end"><button class="btn sm primary" data-act="savePw" data-v="${esc(u.user_id)}">Atur sandi</button><button class="btn sm ghost" data-act="pwUser" data-v="">Batal</button></div></div>`:""}
     ${del?`<div class="edit" style="grid-template-columns:1fr"><p class="note bad">Hapus akun <b>${esc(u.username)}</b>? Pengguna tidak bisa masuk lagi. Foto yang sudah diambilnya tetap tersimpan. Untuk menghentikan akses sementara, pilih Ubah → Nonaktif.</p><div class="row"><button class="btn sm danger solid" data-act="doDelUser" data-v="${esc(u.user_id)}">Ya, hapus akun</button><button class="btn sm ghost" data-act="delUser" data-v="">Batal</button></div></div>`:""}
@@ -1600,12 +1930,13 @@ async function saveProject(patch){
 async function createProject(cfg){try{const pid=await S.store.createProject(cfg);ls.set("pid",pid);S.pid=null;toast("Proyek dibuat.","ok");if(S.route==="atur"){S.sub="proyek"}}catch(e){toast("Gagal membuat proyek: "+errMsg(e),"bad")}}
 async function deleteProject(){const pid=S.pid,box=$("#delProject");if(box)box.innerHTML=`<p class="note">Menghapus proyek dan fotonya…</p>`;try{await S.store.deleteProject(pid);clearProject();ls.set("pid",null);toast("Proyek dihapus.","ok");go("beranda")}catch(e){toast("Penghapusan berhenti: "+errMsg(e),"bad")}}
 async function addUser(){
-  const name=$("#nu-name").value.trim(),u=normUser($("#nu-user").value),code=codeToken($("#nu-code").value),pw=$("#nu-pass").value,role=S.nuRole||"pengumpul";
+  const name=$("#nu-name").value.trim(),u=normUser($("#nu-user").value),code=codeToken($("#nu-code").value),pw=$("#nu-pass").value,role=S.nuRole||"anggota";
+  const projects=role==="admin"?[]:[...document.querySelectorAll(".nu-proj:checked")].map(x=>x.value);
   if(!USER_RE.test(u))return toast("Username 3–30 karakter: huruf kecil, angka, titik, garis bawah, atau strip.","bad");
   if(!/^[A-Z0-9]{2,10}$/.test(code))return toast("Kode fotografer 2–10 huruf besar atau angka, misalnya FA02.","bad");
   if(pw.length<8)return toast("Kata sandi minimal 8 karakter.","bad");
   S.busy=true;
-  try{await S.store.createUser({username:u,password:pw,full_name:name,role,code});S.newCred={username:u,password:pw,role};S.nuPass=null;S.nuRole="pengumpul";toast(`Akun ${u} dibuat.`,"ok")}
+  try{await S.store.createUser({username:u,password:pw,full_name:name,role,code,projects});S.newCred={username:u,password:pw,role,projects};S.nuPass=null;S.nuRole="anggota";S.nuProjects=null;toast(`Akun ${u} dibuat.`,"ok")}
   catch(e){toast(errMsg(e),"bad")}
   finally{S.busy=false;render()}
 }
@@ -1630,17 +1961,19 @@ document.addEventListener("click",async e=>{
     case "snap":snap();break;
     case "nativeCam":stopCamera();$("#fileCam").click();break;
     case "pickLib":stopCamera(true);$("#fileLib").click();break;
-    case "again":{const last=S.lastSaved;S.draft=newDraft(last?last.group_id:null);S.lastSaved=null;renderCaptureParts();openCamera();break}
-    case "newObj":S.draft=newDraft("new");S.lastSaved=null;renderCaptureParts();openCamera();break;
+    case "again":{const last=S.lastSaved;freeDraft(S.draft);S.draft=newDraft(last?last.group_id:null);S.lastSaved=null;renderCaptureParts();openCamera();break}
+    case "newObj":freeDraft(S.draft);S.draft=newDraft("new");S.lastSaved=null;renderCaptureParts();openCamera();break;
     case "cat":S.draft.category=v;renderCategory();renderSavebar();break;
     case "runAI":runAI();break;
     case "aiDownload":aiDownload();break;
     case "aiLoad":aiLoad();break;
     case "aiRemove":aiRemove();break;
     case "aiBench":aiBenchmark();break;
-    case "gnew":S.draft.groupChoice="new";renderGroup();renderCategory();renderSavebar();if(S.draft.blob&&aiOn()&&S.draft.ai.status==="idle"&&aiReady())runAI();break;
+    case "cropAuto":autoCrop();break;
+    case "cropFull":S.draft.crop={x:0,y:0,w:1,h:1};S.draft.cropState="full";renderPhoto();commitCrop();break;
+    case "gnew":S.draft.groupChoice="new";S.draft.manualInput="";S.draft.manualCode="";renderGroup();renderCategory();renderSavebar();if(S.draft.blob&&aiOn()&&S.draft.ai.status==="idle"&&aiReady())runAI();break;
     case "gcont":{const q=$("#g-q");if(q){q.focus();q.scrollIntoView({block:"center",behavior:"smooth"})}else toast("Belum ada objek yang bisa difoto ulang. Pilih “Objek baru”.");break}
-    case "gpick":S.draft.groupChoice=v;S.draft.similar=null;renderGroup();renderCategory();renderSavebar();break;
+    case "gpick":S.draft.groupChoice=v;S.draft.similar=null;S.draft.manualInput="";S.draft.manualCode="";renderGroup();renderCategory();renderSavebar();break;
     case "copyName":{const n=t.dataset.name;if(!n)break;try{await navigator.clipboard.writeText(n);toast("Nama berkas disalin.")}catch{toast(n)}break}
     case "save":saveDraft();break;
     case "galFilter":try{S.gf={...S.gf,...JSON.parse(t.dataset.f)}}catch{}break;
@@ -1654,6 +1987,8 @@ document.addEventListener("click",async e=>{
     case "modalBg":if(e.target===t)closeModal();break;
     case "nav":{const x=filteredImages()[+v];if(x)openDetail(x.id);break}
     case "setStatus":await setStatus([S.modal.id],v);setTimeout(renderModal,200);break;
+    case "rfOne":syncRoboflow([S.modal.id]);break;
+    case "rfAll":syncRoboflow(null);break;
     case "editCat":S.modal.editCat=!S.modal.editCat;S.modal.confirmDel=false;renderModal();break;
     case "applyCat":{const i=S.images.find(x=>x.id===S.modal.id);if(i)changeGroupCategory(i.group_id,v);break}
     case "askDel":S.modal.confirmDel=!S.modal.confirmDel;S.modal.editCat=false;renderModal();break;
@@ -1663,14 +1998,19 @@ document.addEventListener("click",async e=>{
     case "exportCsv":exportMeta("csv");break;
     case "exportJson":exportMeta("json");break;
     case "sub":S.sub=v;S.editUser=S.pwUser=S.delUser=null;render();break;
-    case "nuRole":S.nuRole=v;S.nuPass=$("#nu-pass")?.value||S.nuPass;{const keep={n:$("#nu-name")?.value,u:$("#nu-user")?.value,c:$("#nu-code")?.value};render();if($("#nu-name")){$("#nu-name").value=keep.n||"";$("#nu-user").value=keep.u||"";$("#nu-code").value=keep.c||""}}break;
+    case "nuRole":S.nuRole=v;S.nuPass=$("#nu-pass")?.value||S.nuPass;if(document.querySelector(".nu-proj"))S.nuProjects=[...document.querySelectorAll(".nu-proj:checked")].map(x=>x.value);{const keep={n:$("#nu-name")?.value,u:$("#nu-user")?.value,c:$("#nu-code")?.value};render();if($("#nu-name")){$("#nu-name").value=keep.n||"";$("#nu-user").value=keep.u||"";$("#nu-code").value=keep.c||""}}break;
     case "genPw":{const el=$("#nu-pass");if(el)el.value=genPassword();break}
     case "copyCred":{const txt=credText(S.newCred);try{await navigator.clipboard.writeText(txt);toast("Info masuk disalin. Kirim lewat WhatsApp atau pesan pribadi.","ok")}catch{const r=document.createRange();r.selectNodeContents($("#cred-text"));const sel=getSelection();sel.removeAllRanges();sel.addRange(r);toast("Teks sudah dipilih, salin dengan Ctrl+C atau tahan layar.")}break}
     case "dismissCred":S.newCred=null;render();break;
     case "editUser":S.editUser=v||null;S.pwUser=S.delUser=null;render();break;
     case "pwUser":S.pwUser=v||null;S.editUser=S.delUser=null;render();break;
     case "delUser":S.delUser=v||null;S.editUser=S.pwUser=null;render();break;
-    case "saveUser":{try{await S.store.updateUser(v,{full_name:$("#eu-name").value.trim(),code:codeToken($("#eu-code").value),role:$("#eu-role").value,active:$("#eu-active").value==="1"});S.editUser=null;toast("Pengguna diperbarui.","ok");render()}catch(err){toast(errMsg(err),"bad")}break}
+    case "saveUser":{try{const projBoxes=document.querySelectorAll(".eu-proj"),projs=[...projBoxes].filter(x=>x.checked).map(x=>x.value),role=$("#eu-role").value;
+      await S.store.updateUser(v,{full_name:$("#eu-name").value.trim(),code:codeToken($("#eu-code").value),role,active:$("#eu-active").value==="1"});
+      if(projBoxes.length&&role!=="admin")await S.store.setUserProjects(v,projs);
+      S.editUser=null;toast("Pengguna diperbarui.","ok");render()}catch(err){toast(errMsg(err),"bad")}break}
+    case "rfSaveKey":{const el=$("#rf-key"),key=(el&&el.value||"").trim();if(!key)return toast("Tempel Private API Key Roboflow terlebih dahulu.","bad");
+      try{await S.store.setRoboflowKey(S.pid,key);S.rfKey[S.pid]=true;el.value="";toast("Kunci Roboflow tersimpan di server.","ok");rfRefreshUI()}catch(err){toast(errMsg(err),"bad")}break}
     case "savePw":{const pw=$("#pu-pass").value;if(pw.length<8)return toast("Kata sandi minimal 8 karakter.","bad");try{await S.store.setPassword(v,pw);const u=S.profiles.find(x=>x.user_id===v);S.pwUser=null;S.newCred={username:u.username,password:pw,role:u.role};S.sub="pengguna";toast("Kata sandi diatur ulang.","ok");render();window.scrollTo(0,0)}catch(err){toast(errMsg(err),"bad")}break}
     case "doDelUser":{try{await S.store.deleteUser(v);S.delUser=null;toast("Akun dihapus.","ok");render()}catch(err){toast(errMsg(err),"bad")}break}
     case "addCat":{const code=normLoc($("#n-cat-code").value),name=$("#n-cat-name").value.trim()||code;if(!code)return toast("Isi kode kategori (huruf kecil dan angka).","bad");if((S.project.categories||[]).some(c=>c.code===code))return toast("Kode kategori sudah ada.","bad");await saveProject({categories:[...(S.project.categories||[]),{code,name,desc:"",active:true}]});render();break}
@@ -1697,7 +2037,16 @@ document.addEventListener("change",async e=>{
     ls.set("exportOpts2",S.exportOpts);render();
   }
   if(S.route==="atur"&&S.project&&can("admin")){
-    const pm={"p-name":["name",v=>v.trim()||"Proyek tanpa nama"],"p-desc":["description",v=>v],"p-status":["status",v=>v],"p-target":["targetPerCategory",v=>Math.max(0,+v||0)],"p-q":["jpegQuality",v=>+v],"p-dim":["maxDim",v=>+v],"p-ai":["aiMode",v=>v],"p-learn":["aiLearn",v=>v]};
+    if(e.target.dataset.member!=null){const ids=[...document.querySelectorAll("[data-member]:checked")].map(x=>x.dataset.member);
+      try{await S.store.setProjectMembers(S.pid,ids);toast("Anggota proyek diperbarui.","ok")}catch(err){toast(errMsg(err),"bad");render()}return}
+    if(["rf-enabled","rf-project","rf-split","rf-batch"].includes(id)){
+      const r={...(S.project.roboflow||{})};
+      if(id==="rf-enabled")r.enabled=e.target.checked;
+      if(id==="rf-project"){r.project=rfSlug(val);if(val.trim()&&!r.project)toast("Nama proyek Roboflow tidak dikenali. Pakai slug, mis. sampah-kampus.","bad");e.target.value=r.project}
+      if(id==="rf-split")r.split=val;if(id==="rf-batch")r.batch=val.trim().slice(0,64);
+      await saveProject({roboflow:r});if(id==="rf-enabled"&&r.enabled&&!r.project)toast("Isi nama proyek Roboflow agar pengiriman berjalan.");
+      rfRefreshUI();toast("Tersimpan.");return}
+    const pm={"p-name":["name",v=>v.trim()||"Proyek tanpa nama"],"p-crop":["autoCrop",v=>v==="1"],"p-desc":["description",v=>v],"p-status":["status",v=>v],"p-target":["targetPerCategory",v=>Math.max(0,+v||0)],"p-q":["jpegQuality",v=>+v],"p-dim":["maxDim",v=>+v],"p-ai":["aiMode",v=>v],"p-learn":["aiLearn",v=>v]};
     if(pm[id]){await saveProject({[pm[id][0]]:pm[id][1](val)});if(id==="p-ai"){if(val!=="off"&&AI.cached&&!AI.session)aiLoad();render()}toast("Tersimpan.")}
     if(e.target.dataset.cat!=null){const cats=S.project.categories.map(c=>({...c}));cats[+e.target.dataset.cat][e.target.dataset.k]=val;await saveProject({categories:cats});toast("Tersimpan.")}
     if(e.target.dataset.catact!=null){const cats=S.project.categories.map(c=>({...c}));cats[+e.target.dataset.catact].active=e.target.checked;await saveProject({categories:cats});render()}
@@ -1707,6 +2056,14 @@ document.addEventListener("input",e=>{
   const id=e.target.id;
   if(id==="s-loc"){S.session.location=e.target.value;const h=$("#loc-hint");if(h)h.innerHTML=locHint();clearTimeout(S._lt);S._lt=setTimeout(()=>{ls.set("loc:"+S.pid,S.session.location);renderSavebar()},150)}
   if(id==="d-note")S.draft.note=e.target.value;
+  if(id==="g-code"){
+    const raw=e.target.value.replace(/\D/g,"").slice(0,4);if(raw!==e.target.value)e.target.value=raw;
+    const d=S.draft;d.manualInput=raw;const code=raw?pad4(raw):"";
+    if(!raw){d.manualCode="";if(d.groupChoice==="manual"||S.groups.some(g=>g.id===d.groupChoice))d.groupChoice="new"}
+    else if(S.groups.some(g=>g.id===code)){d.groupChoice=code;d.manualCode=""}
+    else{d.groupChoice="manual";d.manualCode=code}
+    const pos=e.target.selectionStart;renderGroup();renderCategory();renderSavebar();const q=$("#g-code");if(q){q.focus();try{q.setSelectionRange(pos,pos)}catch{}}
+  }
   if(id==="g-q"){S.gq=e.target.value;const pos=e.target.selectionStart;renderGroup();const q=$("#g-q");if(q){q.focus();try{q.setSelectionRange(pos,pos)}catch{}}}
   if(id==="nu-name"){const u=$("#nu-user");if(u&&(!u.dataset.touched))u.value=usernameFrom(e.target.value)}
   if(id==="nu-user")e.target.dataset.touched="1";

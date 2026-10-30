@@ -1,16 +1,19 @@
 -- =====================================================================
--- AI Image Dataset Collector — skema database Supabase (v2)
--- Login memakai username. Akun pertama = admin (dibuat dari aplikasi),
--- akun lain dibuat admin dari menu Pengguna. Tidak ada pendaftaran bebas.
+-- Dataset Collector — skema database Supabase (v3)
+-- • Login username. Akun pertama = admin; akun lain dibuat admin.
+-- • Dua peran: admin (kelola proyek & anggota) dan anggota (ambil foto + verifikasi).
+-- • Setiap proyek hanya bisa dibuka anggotanya. Admin melihat semua proyek.
+-- • ID objek otomatis atau diketik sendiri.
+-- • Status kirim ke Roboflow dicatat per foto (diisi Edge Function roboflow-sync).
 --
--- Jalankan sekali: Supabase → SQL Editor → New query → tempel → Run.
--- Aman dijalankan ulang untuk memperbarui fungsi dan aturan akses.
+-- Jalankan: Supabase → SQL Editor → New query → tempel seluruh isi → Run.
+-- Aman dijalankan ulang, dan aman dijalankan di atas skema v2 (data tetap).
 -- =====================================================================
 
 create extension if not exists pgcrypto with schema extensions;
 
 -- Domain internal: username "budi" disimpan di Supabase Auth sebagai budi@<domain>.
--- Tidak pernah dipakai untuk mengirim email. Nilainya harus sama dengan loginDomain di config.js.
+-- Tidak pernah dipakai mengirim email. Harus sama dengan loginDomain di config.js.
 create or replace function public.login_domain() returns text language sql immutable as $$ select 'dataset-collector.app'::text $$;
 
 -- ---------- Tabel ----------
@@ -18,21 +21,42 @@ create table if not exists public.profiles (
   user_id           uuid primary key references auth.users(id) on delete cascade,
   username          text not null unique check (username ~ '^[a-z0-9][a-z0-9._-]{2,29}$'),
   full_name         text not null default '',
-  role              text not null check (role in ('admin','pemeriksa','pengumpul')),
+  role              text not null,
   photographer_code text not null unique check (photographer_code ~ '^[A-Z0-9]{2,10}$'),
   active            boolean not null default true,
   created_by        uuid,
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now()
 );
+-- migrasi peran v2 (pengumpul/pemeriksa) → anggota
+alter table public.profiles drop constraint if exists profiles_role_check;
+update public.profiles set role = 'anggota' where role in ('pengumpul','pemeriksa');
+alter table public.profiles add constraint profiles_role_check check (role in ('admin','anggota'));
 
 create table if not exists public.projects (
   id          uuid primary key default gen_random_uuid(),
   name        text not null,
-  data        jsonb not null default '{}'::jsonb,   -- kategori, kondisi cahaya, target, pengaturan gambar & AI
+  data        jsonb not null default '{}'::jsonb,
   created_by  uuid default auth.uid(),
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
+);
+
+create table if not exists public.project_members (
+  project_id  uuid not null references public.projects(id) on delete cascade,
+  user_id     uuid not null references public.profiles(user_id) on delete cascade,
+  added_by    uuid default auth.uid(),
+  added_at    timestamptz not null default now(),
+  primary key (project_id, user_id)
+);
+create index if not exists project_members_user on public.project_members(user_id);
+
+-- Kunci API Roboflow per proyek. Tidak bisa dibaca dari aplikasi (tanpa policy select);
+-- hanya Edge Function (secret key) yang membacanya.
+create table if not exists public.project_secrets (
+  project_id        uuid primary key references public.projects(id) on delete cascade,
+  roboflow_api_key  text,
+  updated_at        timestamptz not null default now()
 );
 
 create table if not exists public.counters (
@@ -42,7 +66,7 @@ create table if not exists public.counters (
 
 create table if not exists public.object_groups (
   project_id  uuid not null references public.projects(id) on delete cascade,
-  id          text not null check (id ~ '^[0-9]{4}$' and id <> '0000'),   -- ID objek fisik, 4 digit
+  id          text not null check (id ~ '^[0-9]{4}$' and id <> '0000'),
   category    text not null,
   last_rep    int  not null default 0,
   created_by  uuid default auth.uid(),
@@ -68,17 +92,14 @@ create table if not exists public.images (
   foreign key (project_id, group_id) references public.object_groups(project_id, id) on delete restrict
 );
 create index if not exists images_group on public.images(project_id, group_id);
+alter table public.images add column if not exists roboflow_status text;
+alter table public.images add column if not exists roboflow_id     text;
+alter table public.images add column if not exists roboflow_error  text;
+alter table public.images add column if not exists roboflow_at     timestamptz;
 
-create or replace function public.valid_ymd(p text) returns boolean language plpgsql immutable as $$
-begin
-  if p is null or p !~ '^[0-9]{8}$' then return false; end if;
-  return to_char(to_date(p,'YYYYMMDD'),'YYYYMMDD') = p and substr(p,1,4)::int between 2000 and 2100;
-exception when others then return false;
-end $$;
-
--- ---------- Peran ----------
+-- ---------- Peran & keanggotaan ----------
 create or replace function public.role_rank(r text) returns int language sql immutable as $$
-  select case r when 'admin' then 3 when 'pemeriksa' then 2 when 'pengumpul' then 1 else 0 end $$;
+  select case r when 'admin' then 2 when 'anggota' then 1 else 0 end $$;
 
 create or replace function public.my_role() returns text
 language sql stable security definer set search_path = public as $$
@@ -87,6 +108,19 @@ language sql stable security definer set search_path = public as $$
 create or replace function public.has_role(min_role text) returns boolean
 language sql stable security definer set search_path = public as $$
   select public.role_rank(public.my_role()) >= public.role_rank(min_role) $$;
+
+-- admin aktif, atau anggota aktif yang terdaftar di proyek
+create or replace function public.is_member(p uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select public.has_role('admin')
+      or (public.has_role('anggota') and exists (select 1 from public.project_members m where m.project_id = p and m.user_id = auth.uid())) $$;
+
+create or replace function public.valid_ymd(p text) returns boolean language plpgsql immutable as $$
+begin
+  if p is null or p !~ '^[0-9]{8}$' then return false; end if;
+  return to_char(to_date(p,'YYYYMMDD'),'YYYYMMDD') = p and substr(p,1,4)::int between 2000 and 2100;
+exception when others then return false;
+end $$;
 
 -- ---------- Akun ----------
 create or replace function public._create_auth_user(p_username text, p_password text) returns uuid
@@ -119,7 +153,6 @@ revoke all on function public._create_auth_user(text,text) from public, anon, au
 create or replace function public.needs_setup() returns boolean
 language sql stable security definer set search_path = public as $$ select not exists (select 1 from public.profiles) $$;
 
--- Akun admin pertama. Hanya berhasil selama belum ada satu pun akun.
 create or replace function public.setup_admin(p_username text, p_password text, p_full_name text, p_code text) returns uuid
 language plpgsql security definer set search_path = public as $$
 declare v_id uuid; v_user text := lower(trim(p_username)); v_code text := upper(trim(p_code));
@@ -133,17 +166,21 @@ begin
   return v_id;
 end $$;
 
-create or replace function public.admin_create_user(p_username text, p_password text, p_full_name text, p_role text, p_code text) returns uuid
+drop function if exists public.admin_create_user(text,text,text,text,text);
+create or replace function public.admin_create_user(p_username text, p_password text, p_full_name text, p_role text, p_code text, p_projects uuid[] default '{}')
+returns uuid
 language plpgsql security definer set search_path = public as $$
 declare v_id uuid; v_user text := lower(trim(p_username)); v_code text := upper(trim(p_code));
 begin
   if not public.has_role('admin') then raise exception 'Hanya admin yang dapat menambah pengguna.'; end if;
-  if p_role not in ('admin','pemeriksa','pengumpul') then raise exception 'Peran tidak valid.'; end if;
+  if p_role not in ('admin','anggota') then raise exception 'Peran tidak valid.'; end if;
   if v_code !~ '^[A-Z0-9]{2,10}$' then raise exception 'Kode fotografer 2–10 huruf besar atau angka, misalnya FA02.'; end if;
   if exists (select 1 from public.profiles where photographer_code = v_code) then raise exception 'Kode fotografer % sudah dipakai.', v_code; end if;
   v_id := public._create_auth_user(v_user, p_password);
   insert into public.profiles(user_id, username, full_name, role, photographer_code, active, created_by)
   values (v_id, v_user, trim(coalesce(p_full_name,'')), p_role, v_code, true, auth.uid());
+  insert into public.project_members(project_id, user_id)
+  select p.id, v_id from public.projects p where p.id = any(coalesce(p_projects,'{}')) on conflict do nothing;
   return v_id;
 end $$;
 
@@ -154,7 +191,7 @@ begin
   if not public.has_role('admin') then raise exception 'Hanya admin yang dapat mengubah pengguna.'; end if;
   select * into cur from public.profiles where user_id = p_user for update;
   if not found then raise exception 'Pengguna tidak ditemukan.'; end if;
-  if p_role not in ('admin','pemeriksa','pengumpul') then raise exception 'Peran tidak valid.'; end if;
+  if p_role not in ('admin','anggota') then raise exception 'Peran tidak valid.'; end if;
   if v_code !~ '^[A-Z0-9]{2,10}$' then raise exception 'Kode fotografer 2–10 huruf besar atau angka.'; end if;
   if p_user = auth.uid() and (not p_active or p_role <> 'admin') then raise exception 'Anda tidak dapat menonaktifkan atau menurunkan peran akun sendiri.'; end if;
   if cur.role = 'admin' and cur.active and (p_role <> 'admin' or not p_active)
@@ -185,36 +222,41 @@ begin
   if cur.role = 'admin' and cur.active and (select count(*) from public.profiles where role = 'admin' and active) <= 1 then
     raise exception 'Harus ada minimal satu admin aktif.';
   end if;
-  delete from auth.users where id = p_user;   -- profil ikut terhapus; foto yang sudah diambil tetap ada
+  delete from auth.users where id = p_user;
 end $$;
 
 -- ---------- RLS ----------
-alter table public.profiles      enable row level security;
-alter table public.projects      enable row level security;
-alter table public.counters      enable row level security;
-alter table public.object_groups enable row level security;
-alter table public.images        enable row level security;
+alter table public.profiles        enable row level security;
+alter table public.projects        enable row level security;
+alter table public.project_members enable row level security;
+alter table public.project_secrets enable row level security;
+alter table public.counters        enable row level security;
+alter table public.object_groups   enable row level security;
+alter table public.images          enable row level security;
 
 drop policy if exists profiles_select on public.profiles;
-create policy profiles_select on public.profiles for select to authenticated using (public.has_role('pengumpul'));
+create policy profiles_select on public.profiles for select to authenticated using (public.has_role('anggota'));
 drop policy if exists projects_select on public.projects;
-create policy projects_select on public.projects for select to authenticated using (public.has_role('pengumpul'));
+create policy projects_select on public.projects for select to authenticated using (public.is_member(id));
 drop policy if exists projects_update on public.projects;
 create policy projects_update on public.projects for update to authenticated using (public.has_role('admin')) with check (public.has_role('admin'));
 drop policy if exists projects_delete on public.projects;
 create policy projects_delete on public.projects for delete to authenticated using (public.has_role('admin'));
+drop policy if exists members_select on public.project_members;
+create policy members_select on public.project_members for select to authenticated using (public.has_role('admin') or user_id = auth.uid());
 drop policy if exists counters_select on public.counters;
-create policy counters_select on public.counters for select to authenticated using (public.has_role('pengumpul'));
+create policy counters_select on public.counters for select to authenticated using (public.is_member(project_id));
 drop policy if exists groups_select on public.object_groups;
-create policy groups_select on public.object_groups for select to authenticated using (public.has_role('pengumpul'));
+create policy groups_select on public.object_groups for select to authenticated using (public.is_member(project_id));
 drop policy if exists images_select on public.images;
-create policy images_select on public.images for select to authenticated using (public.has_role('pengumpul'));
+create policy images_select on public.images for select to authenticated using (public.is_member(project_id));
 
-revoke all on public.profiles, public.projects, public.counters, public.object_groups, public.images from anon;
-revoke insert, update, delete on public.profiles, public.counters, public.object_groups, public.images from authenticated;
+revoke all on public.profiles, public.projects, public.project_members, public.project_secrets, public.counters, public.object_groups, public.images from anon;
+revoke all on public.project_secrets from authenticated;
+revoke insert, update, delete on public.profiles, public.project_members, public.counters, public.object_groups, public.images from authenticated;
 revoke insert on public.projects from authenticated;
 
--- ---------- Proyek & foto ----------
+-- ---------- Proyek ----------
 create or replace function public.create_project(p_name text, p_data jsonb) returns uuid
 language plpgsql security definer set search_path = public as $$
 declare v_id uuid;
@@ -222,21 +264,67 @@ begin
   if not public.has_role('admin') then raise exception 'Hanya admin yang dapat membuat proyek.'; end if;
   insert into public.projects(name, data, created_by) values (coalesce(nullif(trim(p_name),''),'Proyek baru'), coalesce(p_data,'{}'::jsonb), auth.uid()) returning id into v_id;
   insert into public.counters(project_id) values (v_id);
+  insert into public.project_members(project_id, user_id) values (v_id, auth.uid()) on conflict do nothing;
   return v_id;
 end $$;
 
--- Simpan satu foto. Nomor ID objek dan ulangan ditetapkan di dalam transaksi dengan penguncian,
--- jadi dua perangkat tidak pernah mendapat nomor sama. Nama berkas disusun di server dari metadata.
--- Kode fotografer diambil dari akun yang sedang masuk.
+-- Atur daftar anggota proyek (menggantikan seluruh daftar).
+create or replace function public.set_project_members(p_project uuid, p_users uuid[]) returns int
+language plpgsql security definer set search_path = public as $$
+declare n int;
+begin
+  if not public.has_role('admin') then raise exception 'Hanya admin yang dapat mengatur anggota proyek.'; end if;
+  if not exists (select 1 from public.projects where id = p_project) then raise exception 'Proyek tidak ditemukan.'; end if;
+  delete from public.project_members where project_id = p_project and not (user_id = any(coalesce(p_users,'{}')));
+  insert into public.project_members(project_id, user_id)
+  select p_project, u.user_id from public.profiles u where u.user_id = any(coalesce(p_users,'{}')) on conflict do nothing;
+  select count(*) into n from public.project_members where project_id = p_project;
+  return n;
+end $$;
+
+-- Atur proyek yang boleh dibuka satu pengguna (menggantikan seluruh daftar).
+create or replace function public.set_user_projects(p_user uuid, p_projects uuid[]) returns int
+language plpgsql security definer set search_path = public as $$
+declare n int;
+begin
+  if not public.has_role('admin') then raise exception 'Hanya admin yang dapat mengatur akses proyek.'; end if;
+  if not exists (select 1 from public.profiles where user_id = p_user) then raise exception 'Pengguna tidak ditemukan.'; end if;
+  delete from public.project_members where user_id = p_user and not (project_id = any(coalesce(p_projects,'{}')));
+  insert into public.project_members(project_id, user_id)
+  select p.id, p_user from public.projects p where p.id = any(coalesce(p_projects,'{}')) on conflict do nothing;
+  select count(*) into n from public.project_members where user_id = p_user;
+  return n;
+end $$;
+
+create or replace function public.set_roboflow_key(p_project uuid, p_key text) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.has_role('admin') then raise exception 'Hanya admin yang dapat mengatur kunci Roboflow.'; end if;
+  insert into public.project_secrets(project_id, roboflow_api_key, updated_at) values (p_project, nullif(trim(p_key),''), now())
+  on conflict (project_id) do update set roboflow_api_key = excluded.roboflow_api_key, updated_at = now();
+end $$;
+
+create or replace function public.has_roboflow_key(p_project uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select public.is_member(p_project) and exists (select 1 from public.project_secrets where project_id = p_project and coalesce(roboflow_api_key,'') <> '') $$;
+
+-- ---------- Foto ----------
+-- Simpan satu foto. Nomor ID objek & ulangan ditetapkan di dalam transaksi dengan penguncian.
+--   p_group  : ID objek yang difoto ulang (atau null)
+--   p_code   : ID objek yang diketik sendiri (atau null). Jika ID sudah ada → foto ulang objek itu;
+--              jika belum ada → objek baru dengan ID tersebut.
+--   keduanya null → objek baru dengan ID berikutnya (otomatis).
+drop function if exists public.save_image(uuid,text,text,text,text,text,jsonb);
 create or replace function public.save_image(p_project uuid, p_group text, p_category text, p_location text,
-                                             p_lighting text, p_date text, p_row jsonb) returns jsonb
+                                             p_lighting text, p_date text, p_row jsonb, p_code text default null) returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare
   me public.profiles; prj public.projects; g public.object_groups; n int; v_rep int; v_prefix text; v_name text;
-  v_id text; v_row jsonb; v_now timestamptz := now(); v_cats text[]; v_lights text[];
+  v_id text; v_row jsonb; v_now timestamptz := now(); v_cats text[]; v_lights text[]; v_target text;
 begin
   select * into me from public.profiles where user_id = auth.uid() and active;
   if not found then raise exception 'Akun Anda tidak aktif. Hubungi admin.'; end if;
+  if not public.is_member(p_project) then raise exception 'Anda bukan anggota proyek ini.'; end if;
   select * into prj from public.projects where id = p_project;
   if not found then raise exception 'Proyek tidak ditemukan.'; end if;
   select array_agg(c->>'code') into v_cats from jsonb_array_elements(prj.data->'categories') c where coalesce((c->>'active')::boolean, true);
@@ -245,17 +333,26 @@ begin
   if p_lighting is null or not (p_lighting = any(coalesce(v_lights, array['in','out']))) then raise exception 'Kondisi cahaya tidak terdaftar.'; end if;
   if not public.valid_ymd(p_date) then raise exception 'Tanggal pengambilan tidak valid.'; end if;
 
-  if p_group is null then
+  insert into public.counters(project_id) values (p_project) on conflict (project_id) do nothing;
+  v_target := coalesce(nullif(p_group,''), nullif(trim(p_code),''));
+  if v_target is not null then
+    if v_target ~ '^[0-9]{1,4}$' then v_target := lpad(v_target, 4, '0'); end if;
+    if v_target !~ '^[0-9]{4}$' or v_target = '0000' then raise exception 'ID objek harus angka 0001–9999.'; end if;
+    perform 1 from public.counters where project_id = p_project for update;
+    select * into g from public.object_groups where project_id = p_project and id = v_target for update;
+    if not found then
+      if p_group is not null then raise exception 'Objek yang dipilih sudah tidak ada.'; end if;
+      if p_category is null or not (p_category = any(v_cats)) then raise exception 'Kategori tidak terdaftar di proyek.'; end if;
+      insert into public.object_groups(project_id, id, category) values (p_project, v_target, p_category) returning * into g;
+      update public.counters set last_number = greatest(last_number, v_target::int) where project_id = p_project;
+    end if;
+  else
     if p_category is null or not (p_category = any(v_cats)) then raise exception 'Kategori tidak terdaftar di proyek.'; end if;
-    insert into public.counters(project_id) values (p_project) on conflict (project_id) do nothing;
     update public.counters
        set last_number = greatest(last_number, coalesce((select max(id::int) from public.object_groups where project_id = p_project), 0)) + 1
      where project_id = p_project returning last_number into n;
     if n > 9999 then raise exception 'ID objek sudah mencapai 9999.'; end if;
     insert into public.object_groups(project_id, id, category) values (p_project, lpad(n::text, 4, '0'), p_category) returning * into g;
-  else
-    select * into g from public.object_groups where project_id = p_project and id = p_group for update;
-    if not found then raise exception 'Objek yang dipilih sudah tidak ada.'; end if;
   end if;
 
   v_prefix := g.category || '_' || p_location || '_' || p_lighting || '_' || p_date || '_' || me.photographer_code;
@@ -282,7 +379,7 @@ create or replace function public.set_status(p_project uuid, p_ids text[], p_sta
 language plpgsql security definer set search_path = public as $$
 declare n int; v_user text := (select username from public.profiles where user_id = auth.uid());
 begin
-  if not public.has_role('pemeriksa') then raise exception 'Hanya pemeriksa atau admin yang dapat memverifikasi.'; end if;
+  if not public.is_member(p_project) then raise exception 'Anda bukan anggota proyek ini.'; end if;
   if p_status not in ('pending','verified','flagged') then raise exception 'Status tidak valid.'; end if;
   update public.images set verification_status = p_status, updated_at = now(),
          data = data || jsonb_build_object('verification_status', p_status, 'reviewed_at', now(), 'reviewed_by', v_user)
@@ -291,12 +388,11 @@ begin
   return n;
 end $$;
 
--- Koreksi kategori satu objek fisik: semua fotonya ganti kategori & nama berkas; prediksi AI awal tetap.
 create or replace function public.relabel_group(p_project uuid, p_group text, p_category text) returns int
 language plpgsql security definer set search_path = public as $$
 declare n int; v_cats text[];
 begin
-  if not public.has_role('pemeriksa') then raise exception 'Hanya pemeriksa atau admin yang dapat mengoreksi label.'; end if;
+  if not public.is_member(p_project) then raise exception 'Anda bukan anggota proyek ini.'; end if;
   select array_agg(c->>'code') into v_cats from public.projects p, jsonb_array_elements(p.data->'categories') c where p.id = p_project;
   if not (p_category = any(v_cats)) then raise exception 'Kategori tidak terdaftar di proyek.'; end if;
   perform 1 from public.object_groups where project_id = p_project and id = p_group for update;
@@ -320,38 +416,53 @@ create or replace function public.delete_image(p_project uuid, p_id text) return
 language plpgsql security definer set search_path = public as $$
 declare v_asset text;
 begin
-  if not public.has_role('pemeriksa') then raise exception 'Hanya pemeriksa atau admin yang dapat menghapus foto.'; end if;
+  if not public.has_role('admin') then raise exception 'Hanya admin yang dapat menghapus foto.'; end if;
   delete from public.images where project_id = p_project and id = p_id returning data->>'asset_id' into v_asset;
   return v_asset;
 end $$;
 
-revoke all on function public.setup_admin(text,text,text,text), public.needs_setup(), public.admin_create_user(text,text,text,text,text),
-  public.admin_update_user(uuid,text,text,text,boolean), public.admin_set_password(uuid,text), public.admin_delete_user(uuid),
-  public.create_project(text,jsonb), public.save_image(uuid,text,text,text,text,text,jsonb), public.set_status(uuid,text[],text),
-  public.relabel_group(uuid,text,text), public.delete_image(uuid,text), public.my_role(), public.has_role(text) from public, anon;
-grant execute on function public.needs_setup(), public.setup_admin(text,text,text,text) to anon, authenticated;
-grant execute on function public.admin_create_user(text,text,text,text,text), public.admin_update_user(uuid,text,text,text,boolean),
+-- ---------- Hak eksekusi ----------
+revoke all on function public.setup_admin(text,text,text,text), public.needs_setup(),
+  public.admin_create_user(text,text,text,text,text,uuid[]), public.admin_update_user(uuid,text,text,text,boolean),
   public.admin_set_password(uuid,text), public.admin_delete_user(uuid), public.create_project(text,jsonb),
-  public.save_image(uuid,text,text,text,text,text,jsonb), public.set_status(uuid,text[],text), public.relabel_group(uuid,text,text),
-  public.delete_image(uuid,text), public.my_role(), public.has_role(text) to authenticated;
+  public.set_project_members(uuid,uuid[]), public.set_user_projects(uuid,uuid[]), public.set_roboflow_key(uuid,text), public.has_roboflow_key(uuid),
+  public.save_image(uuid,text,text,text,text,text,jsonb,text), public.set_status(uuid,text[],text),
+  public.relabel_group(uuid,text,text), public.delete_image(uuid,text), public.my_role(), public.has_role(text),
+  public.is_member(uuid) from public, anon;
+grant execute on function public.needs_setup(), public.setup_admin(text,text,text,text) to anon, authenticated;
+grant execute on function public.admin_create_user(text,text,text,text,text,uuid[]), public.admin_update_user(uuid,text,text,text,boolean),
+  public.admin_set_password(uuid,text), public.admin_delete_user(uuid), public.create_project(text,jsonb),
+  public.set_project_members(uuid,uuid[]), public.set_user_projects(uuid,uuid[]), public.set_roboflow_key(uuid,text), public.has_roboflow_key(uuid),
+  public.save_image(uuid,text,text,text,text,text,jsonb,text), public.set_status(uuid,text[],text),
+  public.relabel_group(uuid,text,text), public.delete_image(uuid,text), public.my_role(), public.has_role(text),
+  public.is_member(uuid) to authenticated;
 
--- ---------- Penyimpanan foto (bucket privat "photos") ----------
+-- ---------- Penyimpanan foto (bucket privat "photos", folder = id proyek) ----------
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('photos', 'photos', false, 10485760, array['image/jpeg'])
 on conflict (id) do nothing;
 
+create or replace function public.photo_member(p_name text) returns boolean
+language plpgsql stable security definer set search_path = public as $$
+declare v_project uuid;
+begin
+  begin v_project := split_part(p_name, '/', 1)::uuid; exception when others then return false; end;
+  return public.is_member(v_project);
+end $$;
+grant execute on function public.photo_member(text) to authenticated;
+
 drop policy if exists "photos_select" on storage.objects;
-create policy "photos_select" on storage.objects for select to authenticated using (bucket_id = 'photos' and public.has_role('pengumpul'));
+create policy "photos_select" on storage.objects for select to authenticated using (bucket_id = 'photos' and public.photo_member(name));
 drop policy if exists "photos_insert" on storage.objects;
-create policy "photos_insert" on storage.objects for insert to authenticated with check (bucket_id = 'photos' and public.has_role('pengumpul'));
+create policy "photos_insert" on storage.objects for insert to authenticated with check (bucket_id = 'photos' and public.photo_member(name));
 drop policy if exists "photos_delete" on storage.objects;
-create policy "photos_delete" on storage.objects for delete to authenticated using (bucket_id = 'photos' and (public.has_role('pemeriksa') or owner_id = auth.uid()::text));
+create policy "photos_delete" on storage.objects for delete to authenticated using (bucket_id = 'photos' and (public.has_role('admin') or (owner_id = auth.uid()::text and public.photo_member(name))));
 
 -- ---------- Sinkronisasi langsung (Realtime) ----------
 do $$
 declare t text;
 begin
-  foreach t in array array['profiles','projects','counters','object_groups','images'] loop
+  foreach t in array array['profiles','projects','project_members','counters','object_groups','images'] loop
     begin execute format('alter publication supabase_realtime add table public.%I', t);
     exception when duplicate_object then null; when undefined_object then null; end;
   end loop;

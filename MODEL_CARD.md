@@ -47,3 +47,18 @@ Waktu inferensi: 6,9 ms (ONNX Runtime CPU) dan 41 ms (ONNX Runtime Web WebAssemb
 3. Kaca bukan kelas; foto kaca cenderung diprediksi plastik atau logam.
 4. Model belum diuji pada foto lapangan kampus di Indonesia. Ukur ulang setelah terkumpul ±50 foto terverifikasi per kelas.
 5. Prapemrosesan di browser memakai resize canvas, bukan bicubic PIL; perbedaan kecil pada probabilitas bisa terjadi.
+
+## Model potong objek (U²-Net-p)
+
+- **Berkas:** `models/u2netp.onnx`, 4,4 MB, float32, masukan 1×3×320×320. Bobot U²-Net-p (Qin dkk., 2020) dengan lisensi Apache-2.0.
+- **Keluaran:** peta saliency 320×320.
+- **Cara membentuk kotak potong:**
+  1. Ambil komponen terhubung dengan nilai >0,5 yang luasnya minimal 15% dari komponen terbesar.
+  2. Gabungkan komponen itu menjadi satu kotak, lalu beri margin 6%.
+- **Aturan yakin:** model dianggap yakin bila semua syarat ini terpenuhi:
+  - nilai maks >0,9;
+  - rasio piksel >0,5 terhadap >0,2 lebih dari 0,5 (peta tajam, bukan kabur);
+  - luas kotak <92% foto.
+- **Jika tidak yakin:** foto disimpan utuh dan anggota diminta mengatur kotak sendiri. Kotak selalu bisa digeser atau diubah ukurannya sebelum disimpan.
+- **Uji visual:** pada sampel AlphaTrash dan TrashNet, kotak tepat mengelilingi objek pada sebagian besar foto. Kegagalan umum terjadi pada objek transparan atau pucat di latar terang, dan pada foto berisi beberapa benda.
+- **Waktu inferensi:** ±230 ms dengan ONNX Runtime CPU di server uji, dan ±2 detik untuk percobaan pertama di Chromium (WebAssembly, 1 thread, termasuk pemanasan). Hasilnya lebih cepat pada foto berikutnya.
