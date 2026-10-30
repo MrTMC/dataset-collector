@@ -846,14 +846,15 @@ function cropBoxFromMap(p,N){
       for(const k of [x>0?j-1:-1,x<N-1?j+1:-1,y>0?j-N:-1,y<N-1?j+N:-1])if(k>=0&&!lab[k]&&q[k]>0.5){lab[k]=cur;st.push(k)}}
     comps.push({size,x0,y0,x1,y1});
   }
-  if(!comps.length)return {box:{x:0,y:0,w:1,h:1},confident:false,raw:mx,f5,f2};
+  if(!comps.length)return {box:{x:0,y:0,w:1,h:1},tight:null,confident:false,raw:mx,f5,f2};
   const big=Math.max(...comps.map(c=>c.size));
   let X0=N,Y0=N,X1=0,Y1=0;for(const c of comps)if(c.size>=0.15*big){X0=Math.min(X0,c.x0);Y0=Math.min(Y0,c.y0);X1=Math.max(X1,c.x1+1);Y1=Math.max(Y1,c.y1+1)}
+  const tight={x:X0/N,y:Y0/N,w:(X1-X0)/N,h:(Y1-Y0)/N};
   let x=X0/N,y=Y0/N,w=(X1-X0)/N,h=(Y1-Y0)/N;const pad=0.06*Math.max(w,h);
   x=Math.max(0,x-pad);y=Math.max(0,y-pad);w=Math.min(1-x,w+2*pad);h=Math.min(1-y,h+2*pad);
   const confident=mx>0.9&&f2>0&&f5/f2>0.5&&f5>0.005&&w*h<0.92;
   const fills=!confident&&mx>0.9&&w*h>=0.92&&f5>0.3;
-  return {box:{x,y,w,h},confident,fills,raw:mx,f5,f2};
+  return {box:{x,y,w,h},tight,confident,fills,raw:mx,f5,f2};
 }
 async function cropDetect(canvas){
   const sess=await cropLoad(false);if(!sess)throw new Error(CROP.err||"Model potong otomatis belum diunduh.");
@@ -924,15 +925,17 @@ class Store{
     const path=c.pid+"/"+c.row.id+".jpg";
     const up=await this.c.storage.from("photos").upload(path,c.blob,{contentType:"image/jpeg",upsert:false});
     if(up.error)throw up.error;
+    let srcPath=null;
+    if(c.srcBlob){const sp=c.pid+"/"+c.row.id+"_asli.jpg";const u2=await this.c.storage.from("photos").upload(sp,c.srcBlob,{contentType:"image/jpeg",upsert:false});if(!u2.error)srcPath=sp}
     try{
-      const row=await this.rpc("save_image",{p_project:c.pid,p_group:c.groupId,p_category:c.category,p_location:c.location,p_lighting:c.lighting,p_date:c.date,p_row:{...c.row,asset_id:path},p_code:c.code||null});
+      const row=await this.rpc("save_image",{p_project:c.pid,p_group:c.groupId,p_category:c.category,p_location:c.location,p_lighting:c.lighting,p_date:c.date,p_row:{...c.row,asset_id:path,source_asset_id:srcPath},p_code:c.code||null});
       this.refresh("groups",c.pid);this.refresh("counters",c.pid);
       return row;
-    }catch(e){await this.c.storage.from("photos").remove([path]).catch(()=>{});throw e}
+    }catch(e){await this.c.storage.from("photos").remove(srcPath?[path,srcPath]:[path]).catch(()=>{});throw e}
   }
   async setStatus(pid,ids,status){for(let i=0;i<ids.length;i+=200)await this.rpc("set_status",{p_project:pid,p_ids:ids.slice(i,i+200),p_status:status});this.refresh("images",pid)}
   async relabelGroup(pid,gid,cat){await this.rpc("relabel_group",{p_project:pid,p_group:gid,p_category:cat});this.refresh("images",pid);this.refresh("groups",pid)}
-  async deleteImage(pid,i){const asset=await this.rpc("delete_image",{p_project:pid,p_id:i.id});if(asset)await this.rmBlob(asset);this.refresh("images",pid)}
+  async deleteImage(pid,i){const asset=await this.rpc("delete_image",{p_project:pid,p_id:i.id});if(asset)await this.rmBlob(asset);if(i.source_asset_id)await this.rmBlob(i.source_asset_id);this.refresh("images",pid)}
   async createProject(cfg){const id=await this.rpc("create_project",{p_name:cfg.name,p_data:cfg});this.refresh("projects");return id}
   async saveProject(pid,cfg){const {id,createdAt,...data}=cfg;const {error}=await this.c.from("projects").update({name:data.name,data,updated_at:new Date().toISOString()}).eq("id",pid);if(error)throw error}
   async deleteProject(pid){
@@ -1130,7 +1133,7 @@ function initSession(){
   S.session={location:ls.get("loc:"+S.pid,""),lighting:l.some(x=>x.code===savedLight)?savedLight:l[0].code,dateIso:todayIso()};
   S.draft=newDraft();S.lastSaved=null;S.recent=[];
 }
-function newDraft(group){return {token:null,src:null,srcUrl:null,srcW:0,srcH:0,crop:{x:0,y:0,w:1,h:1},cropState:"none",cropInfo:null,cropErr:null,cropBusy:false,
+function newDraft(group){return {token:null,src:null,srcUrl:null,srcW:0,srcH:0,crop:{x:0,y:0,w:1,h:1},objectBox:null,cropState:"none",cropInfo:null,cropErr:null,cropBusy:false,
   blob:null,url:null,w:0,h:0,size:0,blur:null,hash:null,flags:[],origName:null,ai:{status:"idle"},category:"",groupChoice:group||null,manualCode:"",manualInput:"",note:"",similar:null}}
 function freeDraft(d){if(!d)return;if(d.url)URL.revokeObjectURL(d.url);if(d.srcUrl)URL.revokeObjectURL(d.srcUrl)}
 async function signOut(){try{await S.sb.auth.signOut()}catch{}if(S.user)resetSession()}
@@ -1310,6 +1313,7 @@ function cropStatus(d){
     default:return {chip:"",text:""};
   }
 }
+const r4=b=>({x:+b.x.toFixed(4),y:+b.y.toFixed(4),w:+b.w.toFixed(4),h:+b.h.toFixed(4)});
 function cropBoxStyle(b){return `left:${(b.x*100).toFixed(3)}%;top:${(b.y*100).toFixed(3)}%;width:${(b.w*100).toFixed(3)}%;height:${(b.h*100).toFixed(3)}%`}
 function renderPhoto(){
   const el=$("#cap-photo");if(!el)return;const d=S.draft,last=S.lastSaved;
@@ -1392,6 +1396,7 @@ async function autoCrop(){
   try{
     const r=await cropDetect(d.src);if(S.draft.token!==token)return;
     d.cropInfo={raw:Math.round(r.raw*1000)/1000,ms:r.ms,confident:r.confident};
+    d.objectBox=(r.confident||r.fills)&&r.tight?r.tight:null;
     if(r.confident){d.crop=r.box;d.cropState="auto"}else{d.crop={x:0,y:0,w:1,h:1};d.cropState=r.fills?"fills":"unsure"}
     await encodeDraft(d);
   }catch(e){if(S.draft.token!==token)return;console.warn(e);d.cropState="error";d.cropErr=String(e&&e.message||e).slice(0,160)+"."}
@@ -1535,7 +1540,7 @@ async function ingest(file,origName){
     const d=S.draft;if(d.srcUrl)URL.revokeObjectURL(d.srcUrl);
     if(!d.groupChoice)d.groupChoice=S.groups.length?null:"new";
     const token={};
-    Object.assign(d,{token,src,srcUrl:URL.createObjectURL(full),srcW:src.width,srcH:src.height,origName,crop:{x:0,y:0,w:1,h:1},cropState:cropOn()?"running":"off",cropInfo:null,cropErr:null,ai:{status:"idle"},similar:null});
+    Object.assign(d,{token,src,srcUrl:URL.createObjectURL(full),srcW:src.width,srcH:src.height,origName,crop:{x:0,y:0,w:1,h:1},objectBox:null,cropState:cropOn()?"running":"off",cropInfo:null,cropErr:null,ai:{status:"idle"},similar:null});
     await encodeDraft(d);
     S.lastSaved=null;renderCaptureParts();
     if(cropOn())autoCrop();else afterCrop(token);
@@ -1564,11 +1569,15 @@ async function saveDraft(){
     category_source:!isNew?"objek":ai&&ai.category===m.category&&!ai.lowConf?"ai_dikonfirmasi":ai?"koreksi_manual":"manual",
     captured_at:now,width:d.w,height:d.h,size_bytes:d.size,blur_score:d.blur,quality_flags:d.flags,hash:d.hash,original_name:d.origName||null,note:(d.note||"").trim(),label_updated_at:null,
     crop_source:{auto:"otomatis",manual:"manual",unsure:"penuh (otomatis ragu)",fills:"penuh (objek memenuhi foto)",full:"penuh",off:"penuh",nomodel:"penuh",error:"penuh"}[d.cropState]||"penuh",
-    crop_box:isFullBox(d.crop)?null:{x:+d.crop.x.toFixed(4),y:+d.crop.y.toFixed(4),w:+d.crop.w.toFixed(4),h:+d.crop.h.toFixed(4)},source_width:d.srcW,source_height:d.srcH,
+    crop_box:isFullBox(d.crop)?null:r4(d.crop),source_width:d.srcW,source_height:d.srcH,
+    // kotak objek pada foto asli (untuk anotasi deteksi objek): kotak manual = pilihan anggota, otomatis = kotak saliency tanpa margin
+    object_box:d.cropState==="manual"?r4(d.crop):(d.cropState==="auto"||d.cropState==="fills")&&d.objectBox?r4(d.objectBox):null,
     id_source:d.groupChoice==="manual"?"manual":d.groupChoice==="new"?"otomatis":"objek"};
   if(row.crop_box&&row.crop_source==="penuh")row.crop_source="manual";
+  // foto asli ikut disimpan bila dipotong, supaya proyek deteksi objek di Roboflow menerima foto utuh + kotak anotasi
+  let srcBlob=null;if(row.crop_box&&d.src){srcBlob=await new Promise(r=>d.src.toBlob(r,"image/jpeg",+S.project.jpegQuality||0.9))}
   try{
-    const saved=await S.store.saveImage({pid:S.pid,groupId:isNew?null:d.groupChoice,code:d.groupChoice==="manual"?d.manualCode:null,category:isNew?m.category:null,location:m.location,lighting:m.lighting,date:m.date,blob:d.blob,row});
+    const saved=await S.store.saveImage({srcBlob,pid:S.pid,groupId:isNew?null:d.groupChoice,code:d.groupChoice==="manual"?d.manualCode:null,category:isNew?m.category:null,location:m.location,lighting:m.lighting,date:m.date,blob:d.blob,row});
     S.lastSaved=saved;S.recent.unshift(saved);S.store.patchImage(saved);
     const gsel=S.groups.find(g=>g.id===saved.group_id);if(gsel)gsel.lastRep=Math.max(gsel.lastRep||0,saved.repetition_number);
     else S.groups.push({id:saved.group_id,code:saved.group_id,category:saved.category_confirmed,lastRep:saved.repetition_number,createdAt:now,updatedAt:now});
@@ -1588,7 +1597,7 @@ function filteredImages(){
 }
 function statusMatch(i,st){
   if(st==="pending")return i.verification_status!=="verified";
-  if(st==="rf_wait")return i.verification_status==="verified"&&!["done","duplicate","uploaded"].includes(i.roboflow_status);
+  if(st==="rf_wait")return i.verification_status==="verified"&&!["done","duplicate"].includes(i.roboflow_status);
   if(st==="rf_error")return i.roboflow_status==="error";
   return i.verification_status===st;
 }
@@ -1604,7 +1613,7 @@ function viewGallery(){
     <select id="gf-cat" aria-label="Kategori"><option value="">Semua kategori</option>${opt((cfg.categories||[]).map(c=>[c.code,c.name]),f.cat)}</select>
     <select id="gf-loc" aria-label="Lokasi"><option value="">Semua lokasi</option>${opt(locs.map(l=>[l,l]),f.loc)}</select>
     <select id="gf-ph" aria-label="Fotografer"><option value="">Semua fotografer</option>${opt(phs.map(p=>[p,p+(nameOfCode(p)?" · "+nameOfCode(p):"")]),f.ph)}</select>
-    <select id="gf-status" aria-label="Status"><option value="">Semua status</option>${opt([["pending","Belum diverifikasi"],["verified","Terverifikasi"],["flagged","Perlu dicek"],...(rfEnabled()?[["rf_wait","Terverifikasi, belum di Roboflow"],["rf_error","Gagal ke Roboflow"]]:[])],f.status)}</select>
+    <select id="gf-status" aria-label="Status"><option value="">Semua status</option>${opt([["pending","Belum diverifikasi"],["verified","Terverifikasi"],["flagged","Perlu dicek"],...(rfEnabled()?[["rf_wait","Terverifikasi, belum di Dataset Roboflow"],["rf_error","Gagal ke Roboflow"]]:[])],f.status)}</select>
     <input type="text" id="gf-code" inputmode="numeric" placeholder="ID objek" value="${esc(f.code)}" aria-label="ID objek">
   </div>
   <div class="row" style="justify-content:space-between">
@@ -1656,7 +1665,7 @@ function renderModal(){
         <button class="btn sm" data-act="editCat">Koreksi kategori</button>${can("admin")?`<button class="btn sm danger" data-act="askDel">Hapus</button>`:""}</div>`:""}
       ${rfEnabled()&&i.verification_status==="verified"?`<div class="note ${i.roboflow_status==="error"?"bad":i.roboflow_status==="uploaded"?"warn":i.roboflow_status?"ok":""} row" style="justify-content:space-between;gap:8px;font-size:.84rem">
         <span>${i.roboflow_status==="done"?`Masuk Dataset Roboflow dengan label <b>${esc(i.category_confirmed)}</b> · ${esc(fmtDate(i.roboflow_at))}`:i.roboflow_status==="duplicate"?"Sudah ada di Roboflow (foto identik)":i.roboflow_status==="uploaded"?`Terunggah ke Roboflow tetapi belum masuk Dataset. ${esc(i.roboflow_error||"")}`:i.roboflow_status==="error"?`Gagal dikirim ke Roboflow: ${esc(i.roboflow_error||"")}`:"Belum terkirim ke Roboflow."}</span>
-        ${["done","duplicate","uploaded"].includes(i.roboflow_status)?"":`<button class="btn sm" data-act="rfOne" ${S.rfBusy?"disabled":""}>${S.rfBusy?'<span class="spin" style="width:12px;height:12px"></span> Mengirim…':"Kirim ke Roboflow"}</button>`}</div>`:""}
+        ${["done","duplicate"].includes(i.roboflow_status)?"":`<button class="btn sm" data-act="rfOne" ${S.rfBusy?"disabled":""}>${S.rfBusy?'<span class="spin" style="width:12px;height:12px"></span> Mengirim…':i.roboflow_status?"Kirim ulang":"Kirim ke Roboflow"}</button>`}</div>`:""}
       ${m.editCat&&g?`<div class="note stack" style="gap:8px"><b>Ubah kategori objek ${esc(g.code)}</b><span>Semua ${sibs.length} foto objek ini berganti kategori dan nama berkasnya disusun ulang. Saran AI awal tetap tersimpan.</span>
         <div class="clsgrid">${cats.map(c=>`<button class="clsbtn ${clsOf(c.code)}" style="${clsStyle(c.code)}min-height:46px" data-act="applyCat" data-v="${esc(c.code)}" aria-pressed="${g.category===c.code}"><b><i></i>${esc(c.name)}</b></button>`).join("")}</div><button class="btn sm ghost" data-act="editCat" style="align-self:flex-start">Batal</button></div>`:""}
       ${m.confirmDel?`<div class="note bad stack" style="gap:8px"><b>Hapus foto ini permanen?</b><span>Berkas dan metadatanya dihapus. Nomor ulangan ${i.repetition_number} tidak dipakai ulang.</span><div class="row"><button class="btn sm danger solid" data-act="doDel">Ya, hapus</button><button class="btn sm" data-act="askDel">Batal</button></div></div>`:""}
@@ -1746,7 +1755,7 @@ function exportRows(){
   const rows=sel.images.map(i=>{const split=sp?sp.get(i.group_id):"";return {...i,split,file_path:o.layout==="split"&&sp?`images/${split}/${i.category_confirmed}/${i.filename}`:`images/${i.filename}`}});
   return {rows,sel,sp};
 }
-function cleanRow(r){const {hash,asset_id,original_name,ai_alternatives,emb,emb_scale,emb_v,...rest}=r;return {...rest,ai_alternatives:(ai_alternatives||[]).map(a=>a.category+":"+a.confidence)}}
+function cleanRow(r){const {hash,asset_id,source_asset_id,original_name,ai_alternatives,emb,emb_scale,emb_v,...rest}=r;return {...rest,ai_alternatives:(ai_alternatives||[]).map(a=>a.category+":"+a.confidence)}}
 function summaryOf(rows,sp){
   const by=k=>rows.reduce((m,r)=>{const v=r[k]||"–";m[v]=(m[v]||0)+1;return m},{});
   const perCat={};for(const r of rows){const c=r.category_confirmed;perCat[c]=perCat[c]||{photos:0,objects:new Set()};perCat[c].photos++;perCat[c].objects.add(r.group_id)}
@@ -1869,14 +1878,14 @@ function rfCard(){
   const waiting=S.images.filter(i=>i.verification_status==="verified"&&!["done","duplicate","uploaded"].includes(i.roboflow_status)).length;
   const done=S.images.filter(i=>["done","duplicate"].includes(i.roboflow_status)).length,errs=S.images.filter(i=>i.roboflow_status==="error").length,unl=S.images.filter(i=>i.roboflow_status==="uploaded").length;
   return `<section class="card" id="rf-card"><div class="card-h"><h2>Kirim ke Roboflow</h2>${r.enabled&&r.project?'<span class="chip ok">Aktif</span>':'<span class="chip">Mati</span>'}</div>
-    <p class="muted small">Saat anggota menekan <b>Verifikasi</b>, foto (yang sudah dipotong) dan nama berkasnya otomatis diunggah ke proyek Roboflow tim. Pada proyek <b>klasifikasi</b>, kategori final ikut dipasang sebagai label, jadi foto langsung masuk <b>Dataset</b>.</p>
+    <p class="muted small">Saat anggota menekan <b>Verifikasi</b>, foto (yang sudah dipotong) dan nama berkasnya otomatis diunggah ke proyek Roboflow tim. Fotonya langsung masuk <b>Dataset</b> berlabel: proyek <b>klasifikasi</b> menerima foto terpotong + kelas, proyek <b>deteksi objek</b> menerima foto utuh + kotak objek dari potong otomatis.</p>
     <label class="row small" style="font-weight:650"><input type="checkbox" id="rf-enabled" ${r.enabled?"checked":""}> Kirim otomatis setelah verifikasi</label>
     <label class="field">Proyek Roboflow<input type="text" id="rf-project" value="${esc(r.project||"")}" placeholder="mis. sampah-kampus" autocapitalize="none" spellcheck="false"><span class="hint">Slug proyek, atau tempel tautan proyek dari app.roboflow.com.</span></label>
     <div class="grid2" style="gap:10px"><label class="field">Split<select id="rf-split">${[["auto","Per objek 70/20/10"],["train","Semua ke train"],["valid","Semua ke valid"],["test","Semua ke test"]].map(([v,l])=>`<option value="${v}" ${(r.split||"auto")===v?"selected":""}>${l}</option>`).join("")}</select></label>
       <label class="field">Nama batch<input type="text" id="rf-batch" value="${esc(r.batch||"")}" placeholder="mis. dataset-collector"></label></div>
     <label class="field">Private API Key<div class="row" style="flex-wrap:nowrap"><input type="password" id="rf-key" autocomplete="off" placeholder="${k===true?"tersimpan — isi untuk mengganti":"tempel Private API Key"}"><button class="btn" type="button" data-act="rfSaveKey">Simpan kunci</button></div>
       <span class="hint">${k===true?'<b style="color:var(--ok)">Kunci tersimpan di server.</b> ':k===false?'<b style="color:var(--bad)">Belum ada kunci.</b> ':""}Ambil di Roboflow → Settings → API Keys. Kunci disimpan di Supabase dan tidak pernah dikirim ke browser anggota.</span></label>
-    <div class="row"><button class="btn" data-act="rfAll" ${waiting&&r.enabled&&r.project&&!S.rfBusy?"":"disabled"}>${S.rfBusy?'<span class="spin" style="width:13px;height:13px"></span> Mengirim…':`Kirim ${fmtInt(waiting)} foto terverifikasi yang belum terkirim`}</button><span class="muted small">${fmtInt(done)} foto sudah di Dataset Roboflow${unl?` · <span style="color:var(--warn)">${unl} belum dilabel</span>`:""}${errs?` · <span style="color:var(--bad)">${errs} gagal</span>`:""}</span></div>
+    <div class="row"><button class="btn" data-act="rfAll" ${waiting&&r.enabled&&r.project&&!S.rfBusy?"":"disabled"}>${S.rfBusy?'<span class="spin" style="width:13px;height:13px"></span> Mengirim…':`Kirim ${fmtInt(waiting)} foto terverifikasi yang belum terkirim`}</button>${unl?`<button class="btn" data-act="rfRetryUnl" ${r.enabled&&r.project&&!S.rfBusy?"":"disabled"}>Kirim ulang ${fmtInt(unl)} foto yang belum masuk Dataset</button>`:""}<span class="muted small">${fmtInt(done)} foto sudah di Dataset Roboflow${unl?` · <span style="color:var(--warn)">${unl} belum dilabel</span>`:""}${errs?` · <span style="color:var(--bad)">${errs} gagal</span>`:""}</span></div>
     <p class="note" style="font-size:.8rem">Membutuhkan Edge Function <span class="mono">roboflow-sync</span> di Supabase (dipasang sekali, lihat README). Split otomatis menaruh semua foto dari satu ID objek di split yang sama. Membatalkan verifikasi tidak menghapus foto dari Roboflow.</p></section>`;
 }
 function rfSlug(s){const t=String(s||"").trim().replace(/^https?:\/\/[^/]+\//,"").replace(/[?#].*$/,"");const p=t.split("/").filter(Boolean);const sl=p.length>=2?p[1]:p[0]||"";return /^[a-z0-9][a-z0-9._-]*$/i.test(sl)?sl.toLowerCase():""}
@@ -1992,6 +2001,7 @@ document.addEventListener("click",async e=>{
     case "setStatus":await setStatus([S.modal.id],v);setTimeout(renderModal,200);break;
     case "rfOne":syncRoboflow([S.modal.id]);break;
     case "rfAll":syncRoboflow(null);break;
+    case "rfRetryUnl":syncRoboflow(S.images.filter(i=>i.roboflow_status==="uploaded").map(i=>i.id));break;
     case "editCat":S.modal.editCat=!S.modal.editCat;S.modal.confirmDel=false;renderModal();break;
     case "applyCat":{const i=S.images.find(x=>x.id===S.modal.id);if(i)changeGroupCategory(i.group_id,v);break}
     case "askDel":S.modal.confirmDel=!S.modal.confirmDel;S.modal.editCat=false;renderModal();break;

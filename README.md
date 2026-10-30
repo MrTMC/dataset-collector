@@ -51,7 +51,9 @@ Saat anggota menekan **Verifikasi**, aplikasi memanggil Edge Function `roboflow-
 1. Memeriksa bahwa pengguna adalah anggota proyek.
 2. Mengambil foto (yang sudah dipotong) dari penyimpanan.
 3. Mengunggahnya ke Roboflow dengan nama berkas yang sama.
-4. Pada proyek **klasifikasi**, memasang kategori final sebagai label, sehingga foto langsung masuk **Dataset** (bukan antrean Annotate). Proyek deteksi objek butuh kotak anotasi, jadi fotonya tetap di Annotate dan ditandai "belum dilabel".
+4. Memasang label sehingga foto langsung masuk **Dataset** (bukan antrean Annotate):
+   - Proyek **klasifikasi**: foto terpotong + kategori final sebagai kelas.
+   - Proyek **deteksi objek**: foto utuh + kotak objek (Pascal VOC) dari potong otomatis atau kotak yang diatur anggota. Karena itu, foto asli ikut disimpan (`<id>_asli.jpg`) setiap kali foto dipotong. Foto tanpa kotak objek (potong otomatis ragu atau foto lama) masuk antrean Annotate dan ditandai "belum dilabel".
 5. Mencatat statusnya di tabel `images` (`roboflow_status`, `roboflow_id`, `roboflow_error`).
 
 **Pasang sekali:**

@@ -1,4 +1,5 @@
 // Edge Function: roboflow-sync
+// Proyek klasifikasi → foto terpotong + label kelas. Proyek deteksi objek → foto utuh + kotak objek (Pascal VOC).
 // Mengirim foto yang sudah diverifikasi ke proyek Roboflow tim, memberi label kelasnya (proyek klasifikasi →
 // langsung masuk Dataset), lalu mencatat statusnya di tabel images.
 //
@@ -92,6 +93,27 @@ export async function labelClassification(f: Fetch, apiKey: string, slug: string
   if (!r.ok || j.error || j.success === false) return msg || ("HTTP " + r.status);
   return null;
 }
+// Pascal VOC untuk satu objek; kotak relatif (0..1) → piksel.
+export function vocXml(filename: string, W: number, H: number, label: string, b: { x: number; y: number; w: number; h: number }) {
+  const cl = (v: number, m: number) => Math.max(0, Math.min(m, Math.round(v)));
+  const esc = (t: string) => t.replace(/[<>&]/g, c => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" } as any)[c]);
+  const x0 = cl(b.x * W, W - 1), y0 = cl(b.y * H, H - 1), x1 = Math.max(x0 + 1, cl((b.x + b.w) * W, W)), y1 = Math.max(y0 + 1, cl((b.y + b.h) * H, H));
+  return `<annotation><folder></folder><filename>${esc(filename)}</filename><size><width>${W}</width><height>${H}</height><depth>3</depth></size><segmented>0</segmented>` +
+    `<object><name>${esc(label)}</name><pose>Unspecified</pose><truncated>0</truncated><difficult>0</difficult><occluded>0</occluded>` +
+    `<bndbox><xmin>${x0}</xmin><ymin>${y0}</ymin><xmax>${x1}</xmax><ymax>${y1}</ymax></bndbox></object></annotation>`;
+}
+export async function labelDetection(f: Fetch, apiKey: string, slug: string, imageId: string, filename: string, W: number, H: number, label: string, box: { x: number; y: number; w: number; h: number }): Promise<string | null> {
+  const name = filename.replace(/\.jpe?g$/i, "") + ".xml";
+  const qs = new URLSearchParams({ api_key: apiKey, name, addToDataset: "true" });
+  const r = await f(`${RF_API}/dataset/${slug}/annotate/${encodeURIComponent(imageId)}?${qs}`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ annotationFile: vocXml(filename, W, H, label, box), labelmap: null }),
+  });
+  const j: any = await r.json().catch(() => ({}));
+  const msg = String((j.error && (j.error.message || j.error)) || j.message || "");
+  if (r.status === 409 && /already annotated/i.test(msg)) return null;
+  if (!r.ok || j.error || j.success === false) return msg || ("HTTP " + r.status);
+  return null;
+}
 // Jelaskan kegagalan "does not exist / missing permissions": kunci milik workspace mana, proyek apa saja yang ada di sana.
 export async function diagnoseRoboflow(f: Fetch, apiKey: string, slug: string): Promise<string> {
   try {
@@ -146,7 +168,8 @@ export async function handle(req: Request, env: Env, f: Fetch = fetch): Promise<
   const ir = await f(q, { headers: asUser });
   if (!ir.ok) return json({ error: "Gagal membaca foto: " + (await ir.text()).slice(0, 200) }, 502);
   const all = (await ir.json()) as any[];
-  const todo = all.filter(r => !["done", "duplicate", "uploaded"].includes(r.roboflow_status));
+  // "uploaded" (terunggah tanpa label) hanya dikirim ulang bila diminta per foto
+  const todo = all.filter(r => !["done", "duplicate"].includes(r.roboflow_status) && (ids || r.roboflow_status !== "uploaded"));
   const batch = todo.slice(0, MAX_PER_CALL);
 
   const results: any[] = [];
@@ -160,15 +183,25 @@ export async function handle(req: Request, env: Env, f: Fetch = fetch): Promise<
   for (const r of batch) {
     const at = new Date().toISOString();
     try {
-      const asset = r.data && r.data.asset_id;
-      if (!asset) throw new Error("berkas foto tidak ditemukan");
-      const br = await f(`${env.url}/storage/v1/object/photos/${asset.split("/").map(encodeURIComponent).join("/")}`, { headers: svc });
+      const d = r.data || {};
+      const cat = d.category_confirmed;
+      if (!d.asset_id) throw new Error("berkas foto tidak ditemukan");
+      if (rf.label !== false && cat && ptype === null) ptype = await projectType(f, apiKey, slug);
+      const detection = !!ptype && ptype !== "classification";
+      // Proyek deteksi objek: kirim foto utuh + kotak objek. Foto asli disimpan saat foto dipotong (source_asset_id);
+      // foto yang tidak dipotong sudah utuh, kotaknya relatif terhadap foto itu sendiri.
+      const ob = d.object_box && d.object_box.w > 0 ? d.object_box : null;
+      let assetPath = d.asset_id, W = +d.width || 0, H = +d.height || 0, box = null as null | { x: number; y: number; w: number; h: number };
+      if (detection && ob) {
+        if (d.crop_box && d.source_asset_id) { assetPath = d.source_asset_id; W = +d.source_width || 0; H = +d.source_height || 0; box = ob; }
+        else if (!d.crop_box) box = ob;
+      }
+      const br = await f(`${env.url}/storage/v1/object/photos/${assetPath.split("/").map(encodeURIComponent).join("/")}`, { headers: svc });
       if (!br.ok) throw new Error("gagal mengambil foto dari penyimpanan (" + br.status + ")");
       const blob = await br.blob();
       const split = splitFor(rf.split || "auto", pid, r.group_id);
       const qs = new URLSearchParams({ api_key: apiKey, name: r.filename, split });
       if (rf.batch) qs.set("batch", String(rf.batch).slice(0, 64));
-      const cat = r.data && r.data.category_confirmed;
       if (cat && rf.tag !== false) qs.append("tag", cat);
       const fd = new FormData();
       fd.append("name", r.filename);
@@ -185,15 +218,14 @@ export async function handle(req: Request, env: Env, f: Fetch = fetch): Promise<
         }
         throw new Error("Roboflow: " + m.slice(0, 240));
       }
-      // Beri label agar foto langsung masuk Dataset (proyek klasifikasi). Proyek deteksi objek butuh kotak anotasi,
-      // jadi fotonya tetap di antrean Annotate Roboflow.
+      // Label → foto langsung masuk Dataset. Klasifikasi: nama kelas. Deteksi objek: kotak (Pascal VOC).
       let status = out.duplicate ? "duplicate" : "done", note: string | null = null;
       if (rf.label !== false && cat && out.id) {
-        if (ptype === null) ptype = await projectType(f, apiKey, slug);
-        if (!ptype || ptype === "classification") {
-          const err = await labelClassification(f, apiKey, slug, String(out.id), cat);
-          if (err) { status = "uploaded"; note = (ptype ? "" : "Tipe proyek tidak terbaca. ") + "Terunggah, tetapi label gagal dipasang: " + err.slice(0, 200); }
-        } else { status = "uploaded"; note = `Proyek Roboflow bertipe ${ptype}: foto masuk antrean Annotate dan perlu diberi kotak anotasi di Roboflow.`; }
+        let err: string | null = null;
+        if (!detection) err = await labelClassification(f, apiKey, slug, String(out.id), cat);
+        else if (box && W && H) err = await labelDetection(f, apiKey, slug, String(out.id), r.filename, W, H, cat, box);
+        else { status = "uploaded"; note = `Proyek Roboflow bertipe ${ptype}, tetapi foto ini tidak punya kotak objek (dipotong otomatis ragu atau foto lama). Atur kotak di Roboflow → Annotate.`; }
+        if (err) { status = "uploaded"; note = (ptype ? "" : "Tipe proyek tidak terbaca. ") + "Terunggah, tetapi label gagal dipasang: " + err.slice(0, 200); }
       } else if (!out.duplicate) { status = "uploaded"; }
       await patch(r.id, { roboflow_status: status, roboflow_id: out.id ? String(out.id) : null, roboflow_error: note, roboflow_at: at });
       results.push({ id: r.id, filename: r.filename, status, split, roboflow_id: out.id || null, note });
